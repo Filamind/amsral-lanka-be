@@ -7,6 +7,7 @@ const {
   date,
   text,
   integer,
+  decimal,
 } = require("drizzle-orm/pg-core");
 
 // Roles table schema
@@ -54,8 +55,127 @@ const employees = pgTable("employees", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// Washing Types table schema
+const washingTypes = pgTable("washing_types", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  code: varchar("code", { length: 20 }).unique().notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Drying Types table schema
+const dryingTypes = pgTable("drying_types", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  code: varchar("code", { length: 20 }).unique().notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Customers table schema
+const customers = pgTable("customers", {
+  id: serial("id").primaryKey(),
+  customerCode: varchar("customer_code", { length: 50 }).unique().notNull(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 255 }).unique(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  postalCode: varchar("postal_code", { length: 20 }),
+  country: varchar("country", { length: 100 }),
+  dateOfBirth: date("date_of_birth"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Item Types table schema
+const itemTypes = pgTable("item_types", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  code: varchar("code", { length: 20 }).unique().notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Customer Orders table schema
+const customerOrders = pgTable("customer_orders", {
+  id: serial("id").primaryKey(),
+  orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
+  customerId: integer("customer_id")
+    .references(() => customers.id)
+    .notNull(),
+  orderDate: date("order_date").notNull(),
+  deliveryDate: date("delivery_date"),
+  status: varchar("status", { length: 50 }).default("pending"), // pending, processing, completed, cancelled
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).default(
+    "0.00"
+  ),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Customer Order Lines table schema
+const customerOrderLines = pgTable("customer_order_lines", {
+  id: serial("id").primaryKey(),
+  customerOrderId: integer("customer_order_id")
+    .references(() => customerOrders.id)
+    .notNull(),
+  itemTypeId: integer("item_type_id")
+    .references(() => itemTypes.id)
+    .notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).default("0.00"),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).default(
+    "0.00"
+  ),
+  description: text("description"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Customer Order Line Process table schema
+const customerOrderLineProcesses = pgTable("customer_order_line_processes", {
+  id: serial("id").primaryKey(),
+  customerOrderLineId: integer("customer_order_line_id")
+    .references(() => customerOrderLines.id)
+    .notNull(),
+  sequenceNumber: integer("sequence_number").notNull(),
+  washingTypeId: integer("washing_type_id").references(() => washingTypes.id),
+  dryingTypeId: integer("drying_type_id").references(() => dryingTypes.id),
+  processType: varchar("process_type", { length: 20 }).notNull(), // 'washing' or 'drying'
+  status: varchar("status", { length: 50 }).default("pending"), // pending, in_progress, completed
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 module.exports = {
   roles,
   users,
   employees,
+  washingTypes,
+  dryingTypes,
+  customers,
+  itemTypes,
+  customerOrders,
+  customerOrderLines,
+  customerOrderLineProcesses,
 };

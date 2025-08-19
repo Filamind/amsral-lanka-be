@@ -10,7 +10,16 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "node src/seeders/userSeeder.js",
+    "db:seed": "node src/seeders/masterSeeder.js seed",
+    "db:unseed": "node src/seeders/masterSeeder.js unseed",
+    "db:reseed": "node src/seeders/masterSeeder.js reseed",
+    "seed:roles": "node src/seeders/roleSeeder.js",
+    "seed:users": "node src/seeders/userSeeder.js",
+    "seed:employees": "node src/seeders/employeeSeeder.js",
+    "seed:washing-types": "node src/seeders/washingTypeSeeder.js",
+    "seed:drying-types": "node src/seeders/dryingTypeSeeder.js",
+    "seed:customers": "node src/seeders/customerSeeder.js",
+    "seed:item-types": "node src/seeders/itemTypeSeeder.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

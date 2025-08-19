@@ -6,6 +6,13 @@ require("dotenv").config();
 const userRoutes = require("./routes/userRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const washingTypeRoutes = require("./routes/washingTypeRoutes");
+const dryingTypeRoutes = require("./routes/dryingTypeRoutes");
+const customerRoutes = require("./routes/customerRoutes");
+const itemTypeRoutes = require("./routes/itemTypeRoutes");
+const customerOrderRoutes = require("./routes/customerOrderRoutes");
+const customerOrderLineRoutes = require("./routes/customerOrderLineRoutes");
+const customerOrderLineProcessRoutes = require("./routes/customerOrderLineProcessRoutes");
 
 // Import database connection
 const { pool } = require("./config/db");
@@ -47,6 +54,13 @@ app.get("/health", async (req, res) => {
 app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/washing-types", washingTypeRoutes);
+app.use("/api/drying-types", dryingTypeRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/item-types", itemTypeRoutes);
+app.use("/api/customer-orders", customerOrderRoutes);
+app.use("/api/customer-order-lines", customerOrderLineRoutes);
+app.use("/api/customer-order-line-processes", customerOrderLineProcessRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -72,6 +86,13 @@ app.get("/", (req, res) => {
       employeeStats: "/api/employees/stats",
       departments: "/api/employees/departments",
       positions: "/api/employees/positions",
+      washingTypes: "/api/washing-types",
+      dryingTypes: "/api/drying-types",
+      customers: "/api/customers",
+      itemTypes: "/api/item-types",
+      customerOrders: "/api/customer-orders",
+      customerOrderLines: "/api/customer-order-lines",
+      customerOrderLineProcesses: "/api/customer-order-line-processes",
     },
   });
 });

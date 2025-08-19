@@ -1,6 +1,17 @@
 const { drizzle } = require("drizzle-orm/node-postgres");
 const { Pool } = require("pg");
-const { roles, users, employees } = require("../db/schema");
+const {
+  roles,
+  users,
+  employees,
+  washingTypes,
+  dryingTypes,
+  customers,
+  itemTypes,
+  customerOrders,
+  customerOrderLines,
+  customerOrderLineProcesses,
+} = require("../db/schema");
 require("dotenv").config();
 
 // Create PostgreSQL connection pool
@@ -21,6 +32,19 @@ pool.on("error", (err) => {
 });
 
 // Create Drizzle instance
-const db = drizzle(pool, { schema: { roles, users, employees } });
+const db = drizzle(pool, {
+  schema: {
+    roles,
+    users,
+    employees,
+    washingTypes,
+    dryingTypes,
+    customers,
+    itemTypes,
+    customerOrders,
+    customerOrderLines,
+    customerOrderLineProcesses,
+  },
+});
 
 module.exports = { db, pool };
