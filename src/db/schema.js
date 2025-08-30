@@ -31,6 +31,7 @@ const users = pgTable("users", {
   dateOfBirth: date("date_of_birth"),
   roleId: integer("role_id").references(() => roles.id),
   isActive: boolean("is_active").default(true),
+  isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -49,8 +50,8 @@ const employees = pgTable("employees", {
   dateOfBirth: date("date_of_birth"),
   address: text("address"),
   emergencyContact: varchar("emergency_contact", { length: 100 }),
-  emergencyPhone: varchar("emergency_phone", { length: 20 }),
   isActive: boolean("is_active").default(true),
+  isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -92,6 +93,7 @@ const customers = pgTable("customers", {
   dateOfBirth: date("date_of_birth"),
   notes: text("notes"),
   isActive: boolean("is_active").default(true),
+  isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

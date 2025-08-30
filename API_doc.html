@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AMSRAL Frontend API Documentation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007acc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007acc;
+            font-size: 28px;
+            margin: 0;
+        }
+        .header p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section-title {
+            background: linear-gradient(135deg, #007acc, #0056b3);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .api-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .api-title {
+            color: #007acc;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .endpoint {
+            background: #e3f2fd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .description {
+            margin-bottom: 15px;
+            color: #555;
+        }
+        .important-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .table th, .table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .table th {
+            background: #007acc;
+            color: white;
+        }
+        .table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AMSRAL FRONTEND - API DOCUMENTATION</h1>
+        <p><strong>For Backend Development Team</strong></p>
+        <p>Project: AMSRAL Lanka - Production Management System</p>
+        <p>Date: August 29, 2025</p>
+        <p>Frontend: React + TypeScript + Vite | Backend: REST API with JSON</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">🔐 AUTHENTICATION APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">1. USER LOGIN</div>
+            <div class="endpoint">POST /api/users/login</div>
+            <div class="description">Authenticate user and return JWT token</div>
+            
+            <strong>Input:</strong>
+            <div class="code-block">{
+  "email": "string",
+  "password": "string"
+}</div>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "message": "string",
+  "token": "string",
+  "user": {
+    "id": "number",
+    "email": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "role": "string"
+  }
+}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">👥 USER MANAGEMENT APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">2. GET ALL USERS</div>
+            <div class="endpoint">GET /api/users</div>
+            <div class="description">Retrieve all users with pagination and search</div>
+            
+            <strong>Query Parameters:</strong>
+            <ul>
+                <li><span class="highlight">search</span>: string (optional) - Search by username, email</li>
+                <li><span class="highlight">page</span>: number (optional) - Page number</li>
+                <li><span class="highlight">limit</span>: number (optional) - Items per page</li>
+            </ul>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "data": [
+    {
+      "id": "number",
+      "email": "string",
+      "firstName": "string",
+      "lastName": "string",
+      "phone": "string",
+      "dateOfBirth": "string (YYYY-MM-DD)",
+      "role": "admin|finance|sales|user",
+      "isActive": boolean,
+      "createdAt": "string (ISO date)",
+      "updatedAt": "string (ISO date)"
+    }
+  ],
+  "total": "number",
+  "page": "number",
+  "limit": "number"
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">3. CREATE USER</div>
+            <div class="endpoint">POST /api/users</div>
+            <div class="description">Create a new user</div>
+            
+            <strong>Input:</strong>
+            <div class="code-block">{
+  "email": "string (required, unique)",
+  "firstName": "string (required)",
+  "lastName": "string (required)",
+  "passwordHash": "string (required)",
+  "phone": "string (optional)",
+  "dateOfBirth": "string (optional, YYYY-MM-DD)",
+  "role": "admin|finance|sales|user (optional, default: user)",
+  "isActive": "boolean (optional, default: true)"
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">4. UPDATE USER</div>
+            <div class="endpoint">PUT /api/users/:id</div>
+            <div class="description">Update existing user (same input as Create User)</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">5. DELETE USER</div>
+            <div class="endpoint">DELETE /api/users/:id</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">🏢 CUSTOMER MANAGEMENT APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">6. GET ALL CUSTOMERS</div>
+            <div class="endpoint">GET /api/customers</div>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "data": [
+    {
+      "id": "number",
+      "customerCode": "string (unique)",
+      "firstName": "string",
+      "lastName": "string",
+      "phone": "string",
+      "email": "string (optional, unique)",
+      "address": "string (optional)",
+      "city": "string (optional)",
+      "notes": "string (optional)",
+      "isActive": boolean,
+      "createdAt": "string (ISO date)",
+      "updatedAt": "string (ISO date)"
+    }
+  ],
+  "total": "number"
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">7. CREATE CUSTOMER</div>
+            <div class="endpoint">POST /api/customers</div>
+            
+            <strong>Input:</strong>
+            <div class="code-block">{
+  "customerCode": "string (required, unique)",
+  "firstName": "string (required)",
+  "lastName": "string (required)",
+  "phone": "string (required)",
+  "email": "string (optional, unique)",
+  "address": "string (optional)",
+  "city": "string (optional)",
+  "notes": "string (optional)",
+  "isActive": "boolean (optional, default: true)"
+}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">👨‍💼 EMPLOYEE MANAGEMENT APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">10. GET ALL EMPLOYEES</div>
+            <div class="endpoint">GET /api/employees</div>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "data": [
+    {
+      "id": "number",
+      "employeeId": "string (unique)",
+      "firstName": "string",
+      "lastName": "string",
+      "phone": "string",
+      "email": "string (optional, unique)",
+      "hireDate": "string (optional, YYYY-MM-DD)",
+      "dateOfBirth": "string (optional, YYYY-MM-DD)",
+      "address": "string (optional)",
+      "emergencyContact": "string (optional)",
+      "emergencyPhone": "string (optional)",
+      "isActive": boolean,
+      "createdAt": "string (ISO date)",
+      "updatedAt": "string (ISO date)"
+    }
+  ]
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">11. CREATE EMPLOYEE</div>
+            <div class="endpoint">POST /api/employees</div>
+            
+            <strong>Input:</strong>
+            <div class="code-block">{
+  "employeeId": "string (required, unique)",
+  "firstName": "string (required)",
+  "lastName": "string (required)",
+  "phone": "string (required)",
+  "email": "string (optional, unique)",
+  "hireDate": "string (optional, YYYY-MM-DD)",
+  "dateOfBirth": "string (optional, YYYY-MM-DD)",
+  "address": "string (optional)",
+  "emergencyContact": "string (optional)",
+  "emergencyPhone": "string (optional)",
+  "isActive": "boolean (optional, default: true)"
+}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">📦 ORDER MANAGEMENT APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">14. GET ALL ORDERS</div>
+            <div class="endpoint">GET /api/orders</div>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "data": [
+    {
+      "id": "number",
+      "date": "string (YYYY-MM-DD)",
+      "referenceNo": "string (unique)",
+      "customerId": "number",
+      "customerName": "string",
+      "item": "string",
+      "quantity": "number",
+      "deliveryDate": "string (optional, YYYY-MM-DD)",
+      "status": "pending|confirmed|processing|shipped|delivered|cancelled",
+      "notes": "string (optional)",
+      "records": [
+        {
+          "id": "number",
+          "quantity": "number",
+          "washType": "string",
+          "washTypeCode": "string",
+          "processTypes": ["string"],
+          "processTypeCodes": ["string"]
+        }
+      ],
+      "createdAt": "string (ISO date)",
+      "updatedAt": "string (ISO date)"
+    }
+  ]
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">15. CREATE ORDER</div>
+            <div class="endpoint">POST /api/orders</div>
+            
+            <strong>Input:</strong>
+            <div class="code-block">{
+  "date": "string (required, YYYY-MM-DD)",
+  "referenceNo": "string (required, unique)",
+  "customerId": "number (required)",
+  "item": "string (required)",
+  "quantity": "number (required)",
+  "deliveryDate": "string (optional, YYYY-MM-DD)",
+  "status": "string (optional, default: pending)",
+  "notes": "string (optional)",
+  "records": [
+    {
+      "quantity": "number (required)",
+      "washType": "string (required)",
+      "processTypes": ["string (required)"]
+    }
+  ]
+}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">⚙️ PRODUCTION WORKFLOW APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">18. GET ALL PRODUCTION RECORDS</div>
+            <div class="endpoint">GET /api/production/records</div>
+            <div class="description">Get all order records for production workflow</div>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "data": [
+    {
+      "id": "string",
+      "orderId": "number",
+      "orderRef": "string",
+      "customerName": "string",
+      "item": "string",
+      "quantity": "number",
+      "remainingQuantity": "number",
+      "washType": "string",
+      "processTypes": ["string"],
+      "status": "pending|in_progress|completed"
+    }
+  ]
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">19. GET MACHINE ASSIGNMENTS</div>
+            <div class="endpoint">GET /api/production/assignments</div>
+            
+            <strong>Output:</strong>
+            <div class="code-block">{
+  "success": boolean,
+  "data": [
+    {
+      "id": "string",
+      "recordId": "string",
+      "orderRef": "string",
+      "customerName": "string",
+      "item": "string",
+      "assignedBy": "string",
+      "assignedById": "number",
+      "quantity": "number",
+      "washingMachine": "W1|W2|W3|W4|W5|W6|W7|W8",
+      "dryingMachine": "D1|D2|D3|D4|D5|D6|D7|D8|D9",
+      "assignedAt": "string (ISO date)"
+    }
+  ]
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">20. CREATE MACHINE ASSIGNMENT</div>
+            <div class="endpoint">POST /api/production/assignments</div>
+            
+            <strong>Input:</strong>
+            <div class="code-block">{
+  "recordId": "string (required)",
+  "assignedById": "number (required)",
+  "quantity": "number (required)",
+  "washingMachine": "string (required, W1-W8)",
+  "dryingMachine": "string (required, D1-D9)"
+}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">📊 REFERENCE DATA APIs</div>
+        
+        <div class="api-item">
+            <div class="api-title">21. GET WASH TYPES</div>
+            <div class="endpoint">GET /api/reference/wash-types</div>
+            
+            <table class="table">
+                <tr><th>Code</th><th>Name</th></tr>
+                <tr><td>N/W</td><td>Normal Wash</td></tr>
+                <tr><td>Hy/W</td><td>Heavy Wash</td></tr>
+                <tr><td>Sil/W</td><td>Silicon Wash</td></tr>
+                <tr><td>Hy/Sil/W</td><td>Heavy Silicon Wash</td></tr>
+                <tr><td>En/W</td><td>Enzyme Wash</td></tr>
+                <tr><td>Hy/En/W</td><td>Heavy Enzyme Wash</td></tr>
+                <tr><td>Dk/W</td><td>Dark Wash</td></tr>
+                <tr><td>Mid/W</td><td>Mid Wash</td></tr>
+                <tr><td>Lit/W</td><td>Light Wash</td></tr>
+                <tr><td>Sky/W</td><td>Sky Wash</td></tr>
+                <tr><td>Acid/W</td><td>Acid Wash</td></tr>
+                <tr><td>Tint/W</td><td>Tint Wash</td></tr>
+                <tr><td>Chem/W</td><td>Chemical Wash</td></tr>
+            </table>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">22. GET PROCESS TYPES</div>
+            <div class="endpoint">GET /api/reference/process-types</div>
+            
+            <table class="table">
+                <tr><th>Code</th><th>Name</th></tr>
+                <tr><td>Reese</td><td>Reese</td></tr>
+                <tr><td>S/B</td><td>Sand Blast</td></tr>
+                <tr><td>V</td><td>Viscose</td></tr>
+                <tr><td>Chev</td><td>Chevron</td></tr>
+                <tr><td>H/S</td><td>Hand Sand</td></tr>
+                <tr><td>Rib</td><td>Rib</td></tr>
+                <tr><td>Tool</td><td>Tool</td></tr>
+                <tr><td>Grnd</td><td>Grind</td></tr>
+            </table>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">23. GET MACHINES</div>
+            <div class="endpoint">GET /api/reference/machines</div>
+            
+            <strong>Washing Machines:</strong> W1, W2, W3, W4, W5, W6, W7, W8 (8 machines)<br>
+            <strong>Drying Machines:</strong> D1, D2, D3, D4, D5, D6, D7, D8, D9 (9 machines)
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">🔧 COMMON RESPONSE PATTERNS</div>
+        
+        <div class="api-item">
+            <div class="api-title">ERROR RESPONSE</div>
+            <div class="code-block">{
+  "success": false,
+  "message": "string",
+  "error": "string (optional)",
+  "details": "object (optional)"
+}</div>
+        </div>
+
+        <div class="api-item">
+            <div class="api-title">VALIDATION ERROR RESPONSE</div>
+            <div class="code-block">{
+  "success": false,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "string",
+      "message": "string"
+    }
+  ]
+}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">🔒 AUTHENTICATION HEADERS</div>
+        
+        <div class="important-note">
+            <strong>All protected endpoints require:</strong><br>
+            <code>Authorization: Bearer &lt;JWT_TOKEN&gt;</code><br>
+            <code>Content-Type: application/json</code>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">📝 IMPORTANT NOTES FOR BACKEND DEVELOPER</div>
+        
+        <div class="important-note">
+            <strong>1. UNIQUE FIELD VALIDATION:</strong><br>
+            customerCode, employeeId, email, referenceNo must be unique<br>
+            Return proper validation errors for duplicates
+        </div>
+
+        <div class="important-note">
+            <strong>2. PRODUCTION WORKFLOW:</strong><br>
+            When creating machine assignments, update remainingQuantity in records<br>
+            Mark record as "completed" when remainingQuantity = 0
+        </div>
+
+        <div class="important-note">
+            <strong>3. ORDER RECORDS:</strong><br>
+            Each order can have multiple processing records<br>
+            Sum of record quantities should equal order quantity<br>
+            Validate this on order creation/update
+        </div>
+
+        <div class="important-note">
+            <strong>4. MACHINE CONSTRAINTS:</strong><br>
+            Washing machines: W1-W8 (8 machines)<br>
+            Drying machines: D1-D9 (9 machines)<br>
+            Each assignment needs both washing AND drying machine
+        </div>
+
+        <div class="important-note">
+            <strong>5. SEARCH FUNCTIONALITY:</strong><br>
+            Implement case-insensitive search across specified fields<br>
+            Support partial matching
+        </div>
+
+        <div class="important-note">
+            <strong>6. DATE FORMATS:</strong><br>
+            Use YYYY-MM-DD format for dates<br>
+            ISO format for timestamps
+        </div>
+    </div>
+</body>
+</html>

@@ -13,6 +13,10 @@ const itemTypeRoutes = require("./routes/itemTypeRoutes");
 const customerOrderRoutes = require("./routes/customerOrderRoutes");
 const customerOrderLineRoutes = require("./routes/customerOrderLineRoutes");
 const customerOrderLineProcessRoutes = require("./routes/customerOrderLineProcessRoutes");
+const validationRoutes = require("./routes/validationRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const productionRoutes = require("./routes/productionRoutes");
+const referenceRoutes = require("./routes/referenceRoutes");
 
 // Import database connection
 const { pool } = require("./config/db");
@@ -20,7 +24,20 @@ const { pool } = require("./config/db");
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: true, // Allow all origins
+    credentials: true, // Allow credentials
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -61,6 +78,10 @@ app.use("/api/item-types", itemTypeRoutes);
 app.use("/api/customer-orders", customerOrderRoutes);
 app.use("/api/customer-order-lines", customerOrderLineRoutes);
 app.use("/api/customer-order-line-processes", customerOrderLineProcessRoutes);
+app.use("/api/validation", validationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/production", productionRoutes);
+app.use("/api/reference", referenceRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -93,6 +114,10 @@ app.get("/", (req, res) => {
       customerOrders: "/api/customer-orders",
       customerOrderLines: "/api/customer-order-lines",
       customerOrderLineProcesses: "/api/customer-order-line-processes",
+      validation: "/api/validation",
+      dashboard: "/api/dashboard",
+      production: "/api/production",
+      reference: "/api/reference",
     },
   });
 });

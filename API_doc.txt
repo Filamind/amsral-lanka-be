@@ -1,0 +1,560 @@
+================================================================================
+                        AMSRAL FRONTEND - API DOCUMENTATION
+                           For Backend Development Team
+================================================================================
+
+Project: AMSRAL Lanka - Production Management System
+Date: August 29, 2025
+Frontend Framework: React + TypeScript + Vite
+Backend Requirements: REST API with JSON responses
+
+================================================================================
+🔐 AUTHENTICATION APIs
+================================================================================
+
+1. USER LOGIN
+   Endpoint: POST /api/users/login
+   Description: Authenticate user and return JWT token
+   
+   Input:
+   {
+     "email": "string",
+     "password": "string"
+   }
+   
+   Output:
+   {
+     "success": boolean,
+     "message": "string",
+     "token": "string",
+     "user": {
+       "id": "number",
+       "email": "string",
+       "firstName": "string",
+       "lastName": "string",
+       "role": "string"
+     }
+   }
+
+================================================================================
+👥 USER MANAGEMENT APIs
+================================================================================
+
+2. GET ALL USERS
+   Endpoint: GET /api/users
+   Description: Retrieve all users with pagination and search
+   
+   Query Parameters:
+   - search: string (optional) - Search by username, email
+   - page: number (optional) - Page number
+   - limit: number (optional) - Items per page
+   
+   Output:
+   {
+     "success": boolean,
+     "data": [
+       {
+         "id": "number",
+         "email": "string",
+         "firstName": "string",
+         "lastName": "string",
+         "phone": "string",
+         "dateOfBirth": "string (YYYY-MM-DD)",
+         "role": "admin|finance|sales|user",
+         "isActive": boolean,
+         "createdAt": "string (ISO date)",
+         "updatedAt": "string (ISO date)"
+       }
+     ],
+     "total": "number",
+     "page": "number",
+     "limit": "number"
+   }
+
+3. CREATE USER
+   Endpoint: POST /api/users
+   Description: Create a new user
+   
+   Input:
+   {
+     "email": "string (required, unique)",
+     "firstName": "string (required)",
+     "lastName": "string (required)",
+     "passwordHash": "string (required)",
+     "phone": "string (optional)",
+     "dateOfBirth": "string (optional, YYYY-MM-DD)",
+     "role": "admin|finance|sales|user (optional, default: user)",
+     "isActive": "boolean (optional, default: true)"
+   }
+   
+   Output:
+   {
+     "success": boolean,
+     "message": "string",
+     "data": {
+       "id": "number",
+       "email": "string",
+       "firstName": "string",
+       "lastName": "string",
+       "role": "string",
+       "isActive": boolean,
+       "createdAt": "string (ISO date)",
+       "updatedAt": "string (ISO date)"
+     }
+   }
+
+4. UPDATE USER
+   Endpoint: PUT /api/users/:id
+   Description: Update existing user
+   Input: Same as Create User (all fields optional except validation rules)
+   Output: Same as Create User
+
+5. DELETE USER
+   Endpoint: DELETE /api/users/:id
+   Output:
+   {
+     "success": boolean,
+     "message": "string"
+   }
+
+================================================================================
+🏢 CUSTOMER MANAGEMENT APIs
+================================================================================
+
+6. GET ALL CUSTOMERS
+   Endpoint: GET /api/customers
+   Query Parameters: search, page, limit
+   
+   Output:
+   {
+     "success": boolean,
+     "data": [
+       {
+         "id": "number",
+         "customerCode": "string (unique)",
+         "firstName": "string",
+         "lastName": "string",
+         "phone": "string",
+         "email": "string (optional, unique)",
+         "address": "string (optional)",
+         "city": "string (optional)",
+         "notes": "string (optional)",
+         "isActive": boolean,
+         "createdAt": "string (ISO date)",
+         "updatedAt": "string (ISO date)"
+       }
+     ],
+     "total": "number"
+   }
+
+7. CREATE CUSTOMER
+   Endpoint: POST /api/customers
+   
+   Input:
+   {
+     "customerCode": "string (required, unique)",
+     "firstName": "string (required)",
+     "lastName": "string (required)",
+     "phone": "string (required)",
+     "email": "string (optional, unique)",
+     "address": "string (optional)",
+     "city": "string (optional)",
+     "notes": "string (optional)",
+     "isActive": "boolean (optional, default: true)"
+   }
+
+8. UPDATE CUSTOMER
+   Endpoint: PUT /api/customers/:id
+   Input: Same as Create Customer
+
+9. DELETE CUSTOMER
+   Endpoint: DELETE /api/customers/:id
+
+================================================================================
+👨‍💼 EMPLOYEE MANAGEMENT APIs
+================================================================================
+
+10. GET ALL EMPLOYEES
+    Endpoint: GET /api/employees
+    
+    Output:
+    {
+      "success": boolean,
+      "data": [
+        {
+          "id": "number",
+          "employeeId": "string (unique)",
+          "firstName": "string",
+          "lastName": "string",
+          "phone": "string",
+          "email": "string (optional, unique)",
+          "hireDate": "string (optional, YYYY-MM-DD)",
+          "dateOfBirth": "string (optional, YYYY-MM-DD)",
+          "address": "string (optional)",
+          "emergencyContact": "string (optional)",
+          "emergencyPhone": "string (optional)",
+          "isActive": boolean,
+          "createdAt": "string (ISO date)",
+          "updatedAt": "string (ISO date)"
+        }
+      ]
+    }
+
+11. CREATE EMPLOYEE
+    Endpoint: POST /api/employees
+    
+    Input:
+    {
+      "employeeId": "string (required, unique)",
+      "firstName": "string (required)",
+      "lastName": "string (required)",
+      "phone": "string (required)",
+      "email": "string (optional, unique)",
+      "hireDate": "string (optional, YYYY-MM-DD)",
+      "dateOfBirth": "string (optional, YYYY-MM-DD)",
+      "address": "string (optional)",
+      "emergencyContact": "string (optional)",
+      "emergencyPhone": "string (optional)",
+      "isActive": "boolean (optional, default: true)"
+    }
+
+12. UPDATE EMPLOYEE
+    Endpoint: PUT /api/employees/:id
+
+13. DELETE EMPLOYEE
+    Endpoint: DELETE /api/employees/:id
+
+================================================================================
+📦 ORDER MANAGEMENT APIs
+================================================================================
+
+14. GET ALL ORDERS
+    Endpoint: GET /api/orders
+    
+    Output:
+    {
+      "success": boolean,
+      "data": [
+        {
+          "id": "number",
+          "date": "string (YYYY-MM-DD)",
+          "referenceNo": "string (unique)",
+          "customerId": "number",
+          "customerName": "string",
+          "item": "string",
+          "quantity": "number",
+          "deliveryDate": "string (optional, YYYY-MM-DD)",
+          "status": "pending|confirmed|processing|shipped|delivered|cancelled",
+          "notes": "string (optional)",
+          "records": [
+            {
+              "id": "number",
+              "quantity": "number",
+              "washType": "string",
+              "washTypeCode": "string",
+              "processTypes": ["string"],
+              "processTypeCodes": ["string"]
+            }
+          ],
+          "createdAt": "string (ISO date)",
+          "updatedAt": "string (ISO date)"
+        }
+      ]
+    }
+
+15. CREATE ORDER
+    Endpoint: POST /api/orders
+    
+    Input:
+    {
+      "date": "string (required, YYYY-MM-DD)",
+      "referenceNo": "string (required, unique)",
+      "customerId": "number (required)",
+      "item": "string (required)",
+      "quantity": "number (required)",
+      "deliveryDate": "string (optional, YYYY-MM-DD)",
+      "status": "string (optional, default: pending)",
+      "notes": "string (optional)",
+      "records": [
+        {
+          "quantity": "number (required)",
+          "washType": "string (required)",
+          "processTypes": ["string (required)"]
+        }
+      ]
+    }
+
+16. UPDATE ORDER
+    Endpoint: PUT /api/orders/:id
+
+17. DELETE ORDER
+    Endpoint: DELETE /api/orders/:id
+
+================================================================================
+⚙️ PRODUCTION WORKFLOW APIs
+================================================================================
+
+18. GET ALL PRODUCTION RECORDS
+    Endpoint: GET /api/production/records
+    Description: Get all order records for production workflow
+    
+    Output:
+    {
+      "success": boolean,
+      "data": [
+        {
+          "id": "string",
+          "orderId": "number",
+          "orderRef": "string",
+          "customerName": "string",
+          "item": "string",
+          "quantity": "number",
+          "remainingQuantity": "number",
+          "washType": "string",
+          "processTypes": ["string"],
+          "status": "pending|in_progress|completed"
+        }
+      ]
+    }
+
+19. GET MACHINE ASSIGNMENTS
+    Endpoint: GET /api/production/assignments
+    
+    Output:
+    {
+      "success": boolean,
+      "data": [
+        {
+          "id": "string",
+          "recordId": "string",
+          "orderRef": "string",
+          "customerName": "string",
+          "item": "string",
+          "assignedBy": "string",
+          "assignedById": "number",
+          "quantity": "number",
+          "washingMachine": "W1|W2|W3|W4|W5|W6|W7|W8",
+          "dryingMachine": "D1|D2|D3|D4|D5|D6|D7|D8|D9",
+          "assignedAt": "string (ISO date)"
+        }
+      ]
+    }
+
+20. CREATE MACHINE ASSIGNMENT
+    Endpoint: POST /api/production/assignments
+    
+    Input:
+    {
+      "recordId": "string (required)",
+      "assignedById": "number (required)",
+      "quantity": "number (required)",
+      "washingMachine": "string (required, W1-W8)",
+      "dryingMachine": "string (required, D1-D9)"
+    }
+    
+    Output:
+    {
+      "success": boolean,
+      "message": "string",
+      "data": {
+        "id": "string",
+        "recordId": "string",
+        "remainingQuantity": "number"
+      }
+    }
+
+================================================================================
+📊 REFERENCE DATA APIs
+================================================================================
+
+21. GET WASH TYPES
+    Endpoint: GET /api/reference/wash-types
+    
+    Output:
+    {
+      "success": boolean,
+      "data": [
+        {"code": "N/W", "name": "Normal Wash"},
+        {"code": "Hy/W", "name": "Heavy Wash"},
+        {"code": "Sil/W", "name": "Silicon Wash"},
+        {"code": "Hy/Sil/W", "name": "Heavy Silicon Wash"},
+        {"code": "En/W", "name": "Enzyme Wash"},
+        {"code": "Hy/En/W", "name": "Heavy Enzyme Wash"},
+        {"code": "Dk/W", "name": "Dark Wash"},
+        {"code": "Mid/W", "name": "Mid Wash"},
+        {"code": "Lit/W", "name": "Light Wash"},
+        {"code": "Sky/W", "name": "Sky Wash"},
+        {"code": "Acid/W", "name": "Acid Wash"},
+        {"code": "Tint/W", "name": "Tint Wash"},
+        {"code": "Chem/W", "name": "Chemical Wash"}
+      ]
+    }
+
+22. GET PROCESS TYPES
+    Endpoint: GET /api/reference/process-types
+    
+    Output:
+    {
+      "success": boolean,
+      "data": [
+        {"code": "Reese", "name": "Reese"},
+        {"code": "S/B", "name": "Sand Blast"},
+        {"code": "V", "name": "Viscose"},
+        {"code": "Chev", "name": "Chevron"},
+        {"code": "H/S", "name": "Hand Sand"},
+        {"code": "Rib", "name": "Rib"},
+        {"code": "Tool", "name": "Tool"},
+        {"code": "Grnd", "name": "Grind"}
+      ]
+    }
+
+23. GET MACHINES
+    Endpoint: GET /api/reference/machines
+    
+    Output:
+    {
+      "success": boolean,
+      "data": {
+        "washing": [
+          {"id": "W1", "name": "Washing Machine W1"},
+          {"id": "W2", "name": "Washing Machine W2"},
+          {"id": "W3", "name": "Washing Machine W3"},
+          {"id": "W4", "name": "Washing Machine W4"},
+          {"id": "W5", "name": "Washing Machine W5"},
+          {"id": "W6", "name": "Washing Machine W6"},
+          {"id": "W7", "name": "Washing Machine W7"},
+          {"id": "W8", "name": "Washing Machine W8"}
+        ],
+        "drying": [
+          {"id": "D1", "name": "Drying Machine D1"},
+          {"id": "D2", "name": "Drying Machine D2"},
+          {"id": "D3", "name": "Drying Machine D3"},
+          {"id": "D4", "name": "Drying Machine D4"},
+          {"id": "D5", "name": "Drying Machine D5"},
+          {"id": "D6", "name": "Drying Machine D6"},
+          {"id": "D7", "name": "Drying Machine D7"},
+          {"id": "D8", "name": "Drying Machine D8"},
+          {"id": "D9", "name": "Drying Machine D9"}
+        ]
+      }
+    }
+
+================================================================================
+🔍 SEARCH & VALIDATION APIs
+================================================================================
+
+24. CHECK UNIQUE FIELDS
+    Endpoint: POST /api/validation/check-unique
+    
+    Input:
+    {
+      "table": "users|customers|employees|orders",
+      "field": "email|customerCode|employeeId|referenceNo",
+      "value": "string",
+      "excludeId": "number (optional, for updates)"
+    }
+    
+    Output:
+    {
+      "success": boolean,
+      "isUnique": boolean,
+      "message": "string"
+    }
+
+================================================================================
+📈 DASHBOARD APIs
+================================================================================
+
+25. GET DASHBOARD STATISTICS
+    Endpoint: GET /api/dashboard/stats
+    
+    Output:
+    {
+      "success": boolean,
+      "data": {
+        "totalOrders": "number",
+        "activeOrders": "number",
+        "completedOrders": "number",
+        "totalCustomers": "number",
+        "activeEmployees": "number",
+        "machineUtilization": {
+          "washing": "number (percentage)",
+          "drying": "number (percentage)"
+        }
+      }
+    }
+
+================================================================================
+🔧 COMMON RESPONSE PATTERNS
+================================================================================
+
+ERROR RESPONSE:
+{
+  "success": false,
+  "message": "string",
+  "error": "string (optional)",
+  "details": "object (optional)"
+}
+
+VALIDATION ERROR RESPONSE:
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "string",
+      "message": "string"
+    }
+  ]
+}
+
+================================================================================
+🔒 AUTHENTICATION HEADERS
+================================================================================
+
+All protected endpoints require:
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+
+================================================================================
+📝 IMPORTANT NOTES FOR BACKEND DEVELOPER
+================================================================================
+
+1. UNIQUE FIELD VALIDATION:
+   - customerCode, employeeId, email, referenceNo must be unique
+   - Return proper validation errors for duplicates
+
+2. PRODUCTION WORKFLOW:
+   - When creating machine assignments, update remainingQuantity in records
+   - Mark record as "completed" when remainingQuantity = 0
+
+3. ORDER RECORDS:
+   - Each order can have multiple processing records
+   - Sum of record quantities should equal order quantity
+   - Validate this on order creation/update
+
+4. MACHINE CONSTRAINTS:
+   - Washing machines: W1-W8 (8 machines)
+   - Drying machines: D1-D9 (9 machines)
+   - Each assignment needs both washing AND drying machine
+
+5. SEARCH FUNCTIONALITY:
+   - Implement case-insensitive search across specified fields
+   - Support partial matching
+
+6. PAGINATION:
+   - Default page size: 10-20 items
+   - Return total count for pagination controls
+
+7. DATE FORMATS:
+   - Use YYYY-MM-DD format for dates
+   - ISO format for timestamps
+
+8. STATUS MANAGEMENT:
+   - Orders: pending → confirmed → processing → shipped → delivered
+   - Can be cancelled at any stage
+   - Update related records when order status changes
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

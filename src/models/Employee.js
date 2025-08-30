@@ -12,18 +12,19 @@ class Employee {
     this.phone = employeeData.phone;
     this.department = employeeData.department;
     this.position = employeeData.position;
-    this.salary = employeeData.salary;
     this.hireDate = employeeData.hireDate || employeeData.hire_date;
     this.dateOfBirth = employeeData.dateOfBirth || employeeData.date_of_birth;
     this.address = employeeData.address;
     this.emergencyContact =
       employeeData.emergencyContact || employeeData.emergency_contact;
-    this.emergencyPhone =
-      employeeData.emergencyPhone || employeeData.emergency_phone;
     this.isActive =
       employeeData.isActive !== undefined
         ? employeeData.isActive
         : employeeData.is_active;
+    this.isDeleted =
+      employeeData.isDeleted !== undefined
+        ? employeeData.isDeleted
+        : employeeData.is_deleted;
     this.createdAt = employeeData.createdAt || employeeData.created_at;
     this.updatedAt = employeeData.updatedAt || employeeData.updated_at;
   }
@@ -33,7 +34,8 @@ class Employee {
     const {
       limit = 50,
       offset = 0,
-      isActive = null,
+      isActive = null, // Keep isActive separate from deletion
+      isDeleted = false, // Default to false to only show non-deleted employees
       department = null,
       position = null,
     } = options;
@@ -43,6 +45,10 @@ class Employee {
 
       // Build where conditions
       const conditions = [];
+      // Always filter by isDeleted unless explicitly requested
+      if (isDeleted !== null) {
+        conditions.push(eq(employees.isDeleted, isDeleted));
+      }
       if (isActive !== null) {
         conditions.push(eq(employees.isActive, isActive));
       }
@@ -121,13 +127,22 @@ class Employee {
 
   // Count total employees
   static async count(options = {}) {
-    const { isActive = null, department = null, position = null } = options;
+    const {
+      isActive = null,
+      isDeleted = false, // Default to false to only count non-deleted employees
+      department = null,
+      position = null,
+    } = options;
 
     try {
       let query = db.select({ count: count() }).from(employees);
 
       // Build where conditions
       const conditions = [];
+      // Always filter by isDeleted unless explicitly requested
+      if (isDeleted !== null) {
+        conditions.push(eq(employees.isDeleted, isDeleted));
+      }
       if (isActive !== null) {
         conditions.push(eq(employees.isActive, isActive));
       }
@@ -155,38 +170,52 @@ class Employee {
   // Create new employee
   static async create(employeeData) {
     const {
-      employeeId,
       firstName,
       lastName,
       email,
       phone = null,
       department = null,
       position = null,
-      salary = null,
       hireDate = null,
       dateOfBirth = null,
       address = null,
       emergencyContact = null,
-      emergencyPhone = null,
+      isActive = true,
     } = employeeData;
 
     try {
+      // Generate auto-increment employeeId
+      const lastEmployee = await db
+        .select({ employeeId: employees.employeeId })
+        .from(employees)
+        .orderBy(desc(employees.id)) // Order by id instead of employeeId
+        .limit(1);
+
+      let nextEmployeeId;
+      if (lastEmployee.length > 0) {
+        const lastId = lastEmployee[0].employeeId;
+        // Try to parse the numeric part of the employeeId
+        const numericPart = parseInt(lastId.replace(/\D/g, "")) || 1000;
+        nextEmployeeId = (numericPart + 1).toString();
+      } else {
+        nextEmployeeId = "1001"; // Start from 1001 if no employees exist
+      }
+
       const result = await db
         .insert(employees)
         .values({
-          employeeId,
+          employeeId: nextEmployeeId,
           firstName,
           lastName,
           email,
           phone,
           department,
           position,
-          salary,
           hireDate,
           dateOfBirth,
           address,
           emergencyContact,
-          emergencyPhone,
+          isActive,
         })
         .returning();
 
@@ -215,7 +244,6 @@ class Employee {
       "phone",
       "department",
       "position",
-      "salary",
       "hireDate",
       "dateOfBirth",
       "address",
@@ -263,6 +291,67 @@ class Employee {
     }
   }
 
+  // Static method to update employee by ID
+  static async update(id, updateData) {
+    try {
+      const employee = await Employee.findById(id);
+      if (!employee) {
+        throw new Error("Employee not found");
+      }
+
+      const allowedFields = [
+        "employeeId",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "department",
+        "position",
+        "hireDate",
+        "dateOfBirth",
+        "address",
+        "emergencyContact",
+        "isActive",
+      ];
+      const updateValues = {};
+
+      // Map the allowed fields
+      for (const [key, value] of Object.entries(updateData)) {
+        if (allowedFields.includes(key)) {
+          updateValues[key] = value;
+        }
+      }
+
+      if (Object.keys(updateValues).length === 0) {
+        throw new Error("No valid fields to update");
+      }
+
+      const result = await db
+        .update(employees)
+        .set(updateValues)
+        .where(eq(employees.id, id))
+        .returning();
+
+      if (result.length === 0) {
+        throw new Error("Employee not found");
+      }
+
+      return new Employee(result[0]);
+    } catch (error) {
+      if (error.code === "23505") {
+        // Unique violation
+        if (error.constraint?.includes("email")) {
+          throw new Error("Email already exists");
+        }
+        if (error.constraint?.includes("employee_id")) {
+          throw new Error("Employee ID already exists");
+        }
+        throw new Error("Duplicate entry found");
+      }
+      throw new Error(`Error updating employee: ${error.message}`);
+    }
+  }
+
   // Delete employee (soft delete by setting is_active to false)
   async delete() {
     try {
@@ -277,6 +366,24 @@ class Employee {
       }
       this.isActive = false;
       return this;
+    } catch (error) {
+      throw new Error(`Error deleting employee: ${error.message}`);
+    }
+  }
+
+  // Static method to delete employee by ID
+  static async delete(id) {
+    try {
+      const result = await db
+        .update(employees)
+        .set({ isDeleted: true })
+        .where(eq(employees.id, id))
+        .returning();
+
+      if (result.length === 0) {
+        throw new Error("Employee not found");
+      }
+      return true;
     } catch (error) {
       throw new Error(`Error deleting employee: ${error.message}`);
     }

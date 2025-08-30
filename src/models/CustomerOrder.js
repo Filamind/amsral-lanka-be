@@ -9,6 +9,7 @@ const {
   sum,
   gte,
   lte,
+  inArray,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
 const { customerOrders, customers } = require("../db/schema");
@@ -414,6 +415,30 @@ class CustomerOrder {
       };
     } catch (error) {
       console.error("Error getting order statistics:", error);
+      throw error;
+    }
+  }
+
+  // Count orders by status (for dashboard)
+  static async countByStatus(statusArray) {
+    try {
+      if (!Array.isArray(statusArray)) {
+        statusArray = [statusArray];
+      }
+
+      const result = await db
+        .select({ count: count() })
+        .from(customerOrders)
+        .where(
+          and(
+            eq(customerOrders.isActive, true),
+            inArray(customerOrders.status, statusArray)
+          )
+        );
+
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error("Error counting orders by status:", error);
       throw error;
     }
   }

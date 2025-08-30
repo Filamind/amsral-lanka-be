@@ -1,9 +1,21 @@
-const { eq, and, or, ilike, count, asc, desc, sum } = require("drizzle-orm");
+const {
+  eq,
+  and,
+  or,
+  ilike,
+  count,
+  asc,
+  desc,
+  sum,
+  sql,
+} = require("drizzle-orm");
 const { db } = require("../config/db");
 const {
   customerOrderLines,
   customerOrders,
   itemTypes,
+  customers,
+  washingTypes,
 } = require("../db/schema");
 
 class CustomerOrderLine {
@@ -386,6 +398,110 @@ class CustomerOrderLine {
       return orderLines;
     } catch (error) {
       console.error("Error bulk creating customer order lines:", error);
+      throw error;
+    }
+  }
+
+  // Find all order lines with details for production workflow
+  static async findAllWithDetails(options = {}) {
+    try {
+      const { status, search, includeProcesses = false } = options;
+
+      let query = db
+        .select({
+          id: customerOrderLines.id,
+          customerOrderId: customerOrderLines.customerOrderId,
+          quantity: customerOrderLines.quantity,
+          remainingQuantity: customerOrderLines.remainingQuantity,
+          status: customerOrderLines.status,
+          itemType: itemTypes.name,
+          item: itemTypes.name,
+          orderNumber: customerOrders.orderNumber,
+          referenceNo: customerOrders.orderNumber,
+          customerName: sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+          washingType: washingTypes.name,
+        })
+        .from(customerOrderLines)
+        .leftJoin(
+          customerOrders,
+          eq(customerOrderLines.customerOrderId, customerOrders.id)
+        )
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .leftJoin(itemTypes, eq(customerOrderLines.itemTypeId, itemTypes.id))
+        .leftJoin(
+          washingTypes,
+          eq(customerOrderLines.washingTypeId, washingTypes.id)
+        )
+        .where(eq(customerOrderLines.isActive, true));
+
+      if (status) {
+        query = query.where(eq(customerOrderLines.status, status));
+      }
+
+      if (search) {
+        query = query.where(
+          or(
+            ilike(customerOrders.orderNumber, `%${search}%`),
+            ilike(customers.firstName, `%${search}%`),
+            ilike(customers.lastName, `%${search}%`),
+            ilike(itemTypes.name, `%${search}%`)
+          )
+        );
+      }
+
+      const result = await query.orderBy(desc(customerOrderLines.createdAt));
+
+      // Add processes if requested
+      if (includeProcesses) {
+        // This would require joining with CustomerOrderLineProcess table
+        // For now, return basic structure
+        return result.map((record) => ({
+          ...record,
+          processes: [], // Placeholder - implement actual process joining
+        }));
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Error finding order lines with details:", error);
+      throw error;
+    }
+  }
+
+  // Update remaining quantity for production workflow
+  static async updateRemainingQuantity(id, remainingQuantity) {
+    try {
+      const [orderLine] = await db
+        .update(customerOrderLines)
+        .set({
+          remainingQuantity,
+          updatedAt: new Date(),
+        })
+        .where(eq(customerOrderLines.id, id))
+        .returning();
+
+      return orderLine;
+    } catch (error) {
+      console.error("Error updating remaining quantity:", error);
+      throw error;
+    }
+  }
+
+  // Update status for production workflow
+  static async updateStatus(id, status) {
+    try {
+      const [orderLine] = await db
+        .update(customerOrderLines)
+        .set({
+          status,
+          updatedAt: new Date(),
+        })
+        .where(eq(customerOrderLines.id, id))
+        .returning();
+
+      return orderLine;
+    } catch (error) {
+      console.error("Error updating status:", error);
       throw error;
     }
   }

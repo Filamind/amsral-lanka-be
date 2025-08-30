@@ -1,4 +1,15 @@
-const { eq, and, or, ilike, count, asc, desc, max } = require("drizzle-orm");
+const {
+  eq,
+  and,
+  or,
+  ilike,
+  count,
+  asc,
+  desc,
+  max,
+  sql,
+  isNotNull,
+} = require("drizzle-orm");
 const { db } = require("../config/db");
 const {
   customerOrderLineProcesses,
@@ -7,6 +18,8 @@ const {
   dryingTypes,
   customerOrders,
   itemTypes,
+  customers,
+  users,
 } = require("../db/schema");
 
 class CustomerOrderLineProcess {
@@ -499,6 +512,58 @@ class CustomerOrderLineProcess {
       return (result.maxSeq || 0) + 1;
     } catch (error) {
       console.error("Error getting next sequence number:", error);
+      throw error;
+    }
+  }
+
+  // Find all processes with machine assignments for production workflow
+  static async findAllWithMachineAssignments(options = {}) {
+    try {
+      const processList = await db
+        .select({
+          id: customerOrderLineProcesses.id,
+          customerOrderId: customerOrderLines.customerOrderId,
+          customerOrderLineId: customerOrderLineProcesses.customerOrderLineId,
+          quantity: customerOrderLineProcesses.quantity,
+          washingMachine: customerOrderLineProcesses.washingMachine,
+          dryingMachine: customerOrderLineProcesses.dryingMachine,
+          assignedBy: customerOrderLineProcesses.assignedBy,
+          assignedAt: customerOrderLineProcesses.assignedAt,
+          createdAt: customerOrderLineProcesses.createdAt,
+          orderNumber: customerOrders.orderNumber,
+          referenceNo: customerOrders.orderNumber,
+          customerName: sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+          itemType: itemTypes.name,
+          item: itemTypes.name,
+          assignedByName: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        })
+        .from(customerOrderLineProcesses)
+        .leftJoin(
+          customerOrderLines,
+          eq(
+            customerOrderLineProcesses.customerOrderLineId,
+            customerOrderLines.id
+          )
+        )
+        .leftJoin(
+          customerOrders,
+          eq(customerOrderLines.customerOrderId, customerOrders.id)
+        )
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .leftJoin(itemTypes, eq(customerOrderLines.itemTypeId, itemTypes.id))
+        .leftJoin(users, eq(customerOrderLineProcesses.assignedBy, users.id))
+        .where(
+          and(
+            eq(customerOrderLineProcesses.isActive, true),
+            isNotNull(customerOrderLineProcesses.washingMachine),
+            isNotNull(customerOrderLineProcesses.dryingMachine)
+          )
+        )
+        .orderBy(desc(customerOrderLineProcesses.createdAt));
+
+      return processList;
+    } catch (error) {
+      console.error("Error finding processes with machine assignments:", error);
       throw error;
     }
   }
