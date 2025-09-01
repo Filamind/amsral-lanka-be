@@ -6,6 +6,9 @@ const router = express.Router();
 // GET /api/roles - Get all roles with pagination
 router.get("/", RoleController.getRoles);
 
+// GET /api/roles/map - Get roles as id-name map for dropdowns
+router.get("/map", RoleController.getRoleMap);
+
 // GET /api/roles/stats - Get role statistics
 router.get("/stats", RoleController.getRoleStats);
 

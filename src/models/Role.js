@@ -159,6 +159,24 @@ class Role {
     }
   }
 
+  // Get roles as a map with id and name for dropdowns/selects
+  static async getRoleMap() {
+    try {
+      const result = await db
+        .select({
+          id: roles.id,
+          name: roles.name,
+        })
+        .from(roles)
+        .where(eq(roles.isActive, true))
+        .orderBy(roles.name);
+
+      return result;
+    } catch (error) {
+      throw new Error(`Error fetching role map: ${error.message}`);
+    }
+  }
+
   // Get predefined roles
   static getPredefinedRoles() {
     return [

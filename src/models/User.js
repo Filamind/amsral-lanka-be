@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 class User {
   constructor(userData) {
     this.id = userData.id;
+    this.username = userData.username;
     this.email = userData.email;
     this.firstName = userData.firstName || userData.first_name;
     this.lastName = userData.lastName || userData.last_name;
@@ -15,6 +16,10 @@ class User {
     this.roleId = userData.roleId || userData.role_id;
     this.isActive =
       userData.isActive !== undefined ? userData.isActive : userData.is_active;
+    this.isDeleted =
+      userData.isDeleted !== undefined
+        ? userData.isDeleted
+        : userData.is_deleted;
     this.createdAt = userData.createdAt || userData.created_at;
     this.updatedAt = userData.updatedAt || userData.updated_at;
 
@@ -24,13 +29,63 @@ class User {
 
   // Get all users
   static async findAll(options = {}) {
-    const { limit = 50, offset = 0, isActive = null } = options;
+    const {
+      limit = 50,
+      offset = 0,
+      isActive = null,
+      includeDeleted = false,
+      search = null,
+    } = options;
 
     try {
-      let query = db.select().from(users);
+      let query = db
+        .select({
+          id: users.id,
+          username: users.username,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+          dateOfBirth: users.dateOfBirth,
+          roleId: users.roleId,
+          isActive: users.isActive,
+          isDeleted: users.isDeleted,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          role: {
+            id: roles.id,
+            name: roles.name,
+            description: roles.description,
+          },
+        })
+        .from(users)
+        .leftJoin(roles, eq(users.roleId, roles.id));
+
+      const conditions = [];
 
       if (isActive !== null) {
-        query = query.where(eq(users.isActive, isActive));
+        conditions.push(eq(users.isActive, isActive));
+      }
+
+      if (!includeDeleted) {
+        conditions.push(eq(users.isDeleted, false));
+      }
+
+      if (search) {
+        const { or, ilike } = require("drizzle-orm");
+        conditions.push(
+          or(
+            ilike(users.firstName, `%${search}%`),
+            ilike(users.lastName, `%${search}%`),
+            ilike(users.email, `%${search}%`),
+            ilike(users.phone, `%${search}%`)
+          )
+        );
+      }
+
+      if (conditions.length > 0) {
+        const { and } = require("drizzle-orm");
+        query = query.where(and(...conditions));
       }
 
       const result = await query
@@ -47,7 +102,30 @@ class User {
   // Get user by ID
   static async findById(id) {
     try {
-      const result = await db.select().from(users).where(eq(users.id, id));
+      const result = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+          dateOfBirth: users.dateOfBirth,
+          roleId: users.roleId,
+          isActive: users.isActive,
+          isDeleted: users.isDeleted,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          role: {
+            id: roles.id,
+            name: roles.name,
+            description: roles.description,
+          },
+        })
+        .from(users)
+        .leftJoin(roles, eq(users.roleId, roles.id))
+        .where(eq(users.id, id));
+
       if (result.length === 0) {
         return null;
       }
@@ -61,9 +139,63 @@ class User {
   static async findByEmail(email) {
     try {
       const result = await db
-        .select()
+        .select({
+          id: users.id,
+          username: users.username,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+          dateOfBirth: users.dateOfBirth,
+          roleId: users.roleId,
+          isActive: users.isActive,
+          isDeleted: users.isDeleted,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          passwordHash: users.passwordHash,
+          role: {
+            id: roles.id,
+            name: roles.name,
+            description: roles.description,
+          },
+        })
         .from(users)
+        .leftJoin(roles, eq(users.roleId, roles.id))
         .where(eq(users.email, email));
+
+      if (result.length === 0) {
+        return null;
+      }
+      return new User(result[0]);
+    } catch (error) {
+      throw new Error(`Error fetching user: ${error.message}`);
+    }
+  }
+
+  // Get user by username
+  static async findByUsername(username) {
+    try {
+      const result = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+          dateOfBirth: users.dateOfBirth,
+          roleId: users.roleId,
+          isActive: users.isActive,
+          isDeleted: users.isDeleted,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          passwordHash: users.passwordHash,
+          role: roles.name,
+        })
+        .from(users)
+        .leftJoin(roles, eq(users.roleId, roles.id))
+        .where(eq(users.username, username));
+
       if (result.length === 0) {
         return null;
       }
@@ -74,12 +206,34 @@ class User {
   }
 
   // Count total users
-  static async count(isActive = null) {
+  static async count(isActive = null, includeDeleted = false, search = null) {
     try {
       let query = db.select({ count: count() }).from(users);
+      const conditions = [];
 
       if (isActive !== null) {
-        query = query.where(eq(users.isActive, isActive));
+        conditions.push(eq(users.isActive, isActive));
+      }
+
+      if (!includeDeleted) {
+        conditions.push(eq(users.isDeleted, false));
+      }
+
+      if (search) {
+        const { or, ilike } = require("drizzle-orm");
+        conditions.push(
+          or(
+            ilike(users.firstName, `%${search}%`),
+            ilike(users.lastName, `%${search}%`),
+            ilike(users.email, `%${search}%`),
+            ilike(users.phone, `%${search}%`)
+          )
+        );
+      }
+
+      if (conditions.length > 0) {
+        const { and } = require("drizzle-orm");
+        query = query.where(and(...conditions));
       }
 
       const result = await query;
@@ -92,6 +246,7 @@ class User {
   // Create new user
   static async create(userData) {
     const {
+      username,
       email,
       firstName,
       lastName,
@@ -113,6 +268,7 @@ class User {
       const result = await db
         .insert(users)
         .values({
+          username,
           email,
           firstName,
           lastName,
@@ -143,6 +299,7 @@ class User {
       }
 
       const allowedFields = [
+        "username",
         "email",
         "firstName",
         "lastName",
@@ -187,7 +344,8 @@ class User {
         throw new Error("User not found");
       }
 
-      return new User(result[0]);
+      // Return updated user with role information
+      return await User.findById(id);
     } catch (error) {
       if (error.message === "Email already exists" || error.code === "23505") {
         throw new Error("Email already exists");
@@ -196,12 +354,15 @@ class User {
     }
   }
 
-  // Static method to delete user by ID
+  // Static method to delete user by ID (soft delete)
   static async delete(id) {
     try {
       const result = await db
         .update(users)
-        .set({ isActive: false })
+        .set({
+          isDeleted: true,
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, id))
         .returning();
 
@@ -218,8 +379,28 @@ class User {
   static async authenticate(email, password) {
     try {
       const result = await db
-        .select()
+        .select({
+          id: users.id,
+          username: users.username,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+          dateOfBirth: users.dateOfBirth,
+          roleId: users.roleId,
+          isActive: users.isActive,
+          isDeleted: users.isDeleted,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          passwordHash: users.passwordHash,
+          role: {
+            id: roles.id,
+            name: roles.name,
+            description: roles.description,
+          },
+        })
         .from(users)
+        .leftJoin(roles, eq(users.roleId, roles.id))
         .where(eq(users.email, email.toLowerCase()));
 
       if (result.length === 0) {
@@ -254,7 +435,8 @@ class User {
     const payload = {
       id: user.id,
       email: user.email,
-      role: user.role || "user",
+      role: user.role?.name || "user",
+      roleId: user.roleId,
     };
 
     return jwt.sign(payload, process.env.JWT_SECRET || "default-secret", {
@@ -265,6 +447,7 @@ class User {
   // Update user
   async update(updateData) {
     const allowedFields = [
+      "username",
       "firstName",
       "lastName",
       "phone",
@@ -305,19 +488,22 @@ class User {
     }
   }
 
-  // Delete user (soft delete by setting is_active to false)
+  // Delete user (soft delete by setting isDeleted to true)
   async delete() {
     try {
       const result = await db
         .update(users)
-        .set({ isActive: false })
+        .set({
+          isDeleted: true,
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, this.id))
         .returning();
 
       if (result.length === 0) {
         throw new Error("User not found");
       }
-      this.isActive = false;
+      this.isDeleted = true;
       return this;
     } catch (error) {
       throw new Error(`Error deleting user: ${error.message}`);

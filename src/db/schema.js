@@ -23,6 +23,7 @@ const roles = pgTable("roles", {
 // Users table schema
 const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  username: varchar("username", { length: 50 }).unique().notNull(),
   email: varchar("email", { length: 255 }).unique().notNull(),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
@@ -87,7 +88,7 @@ const customers = pgTable("customers", {
   email: varchar("email", { length: 255 }).unique(),
   phone: varchar("phone", { length: 20 }).notNull(),
   address: text("address"),
-  city: varchar("city", { length: 100 }),
+  mapLink: text("map_link"), // Changed from city to map link
   postalCode: varchar("postal_code", { length: 20 }),
   country: varchar("country", { length: 100 }),
   dateOfBirth: date("date_of_birth"),

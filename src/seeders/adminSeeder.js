@@ -57,6 +57,7 @@ async function seedAdmin() {
     const hashedPassword = await bcrypt.hash(adminPassword, saltRounds);
 
     const adminUser = {
+      username: "admin",
       email: "admin@amsral.com",
       firstName: "System",
       lastName: "Administrator",

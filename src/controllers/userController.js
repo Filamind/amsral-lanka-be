@@ -8,6 +8,8 @@ class UserController {
       const limit = parseInt(req.query.limit) || 10;
       const isActive =
         req.query.active !== undefined ? req.query.active === "true" : null;
+      const includeDeleted = req.query.includeDeleted === "true";
+      const search = req.query.search;
 
       const offset = (page - 1) * limit;
 
@@ -27,8 +29,8 @@ class UserController {
       }
 
       const [users, totalCount] = await Promise.all([
-        User.findAll({ limit, offset, isActive }),
-        User.count(isActive),
+        User.findAll({ limit, offset, isActive, includeDeleted, search }),
+        User.count(isActive, includeDeleted, search),
       ]);
 
       const totalPages = Math.ceil(totalCount / limit);
@@ -222,6 +224,7 @@ class UserController {
   static async createUser(req, res) {
     try {
       const {
+        username,
         email,
         firstName,
         lastName,
@@ -233,10 +236,11 @@ class UserController {
       } = req.body;
 
       // Validate required fields
-      if (!email || !firstName || !lastName || !passwordHash) {
+      if (!username || !email || !firstName || !lastName || !passwordHash) {
         return res.status(400).json({
           success: false,
-          message: "Email, firstName, lastName, and passwordHash are required",
+          message:
+            "Username, email, firstName, lastName, and passwordHash are required",
         });
       }
 
@@ -246,6 +250,26 @@ class UserController {
         return res.status(400).json({
           success: false,
           message: "Invalid email format",
+        });
+      }
+
+      // Check if username already exists
+      const existingUserByUsername = await User.findByUsername(username.trim());
+      if (existingUserByUsername) {
+        return res.status(409).json({
+          success: false,
+          message: "Username already exists",
+        });
+      }
+
+      // Check if email already exists
+      const existingUserByEmail = await User.findByEmail(
+        email.trim().toLowerCase()
+      );
+      if (existingUserByEmail) {
+        return res.status(409).json({
+          success: false,
+          message: "Email already exists",
         });
       }
 
@@ -259,6 +283,7 @@ class UserController {
       }
 
       const userData = {
+        username: username.trim(),
         email: email.trim().toLowerCase(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -311,6 +336,7 @@ class UserController {
     try {
       const { id } = req.params;
       const {
+        username,
         email,
         firstName,
         lastName,
@@ -347,6 +373,34 @@ class UserController {
             message: "Invalid email format",
           });
         }
+
+        // Check if email already exists (excluding current user)
+        const existingUserByEmail = await User.findByEmail(
+          email.trim().toLowerCase()
+        );
+        if (existingUserByEmail && existingUserByEmail.id !== parseInt(id)) {
+          return res.status(409).json({
+            success: false,
+            message: "Email already exists",
+          });
+        }
+      }
+
+      // Validate username if provided
+      if (username) {
+        // Check if username already exists (excluding current user)
+        const existingUserByUsername = await User.findByUsername(
+          username.trim()
+        );
+        if (
+          existingUserByUsername &&
+          existingUserByUsername.id !== parseInt(id)
+        ) {
+          return res.status(409).json({
+            success: false,
+            message: "Username already exists",
+          });
+        }
       }
 
       // Validate role if provided
@@ -362,6 +416,7 @@ class UserController {
       }
 
       const userData = {};
+      if (username !== undefined) userData.username = username.trim();
       if (email !== undefined) userData.email = email.trim().toLowerCase();
       if (firstName !== undefined) userData.firstName = firstName.trim();
       if (lastName !== undefined) userData.lastName = lastName.trim();
@@ -438,6 +493,45 @@ class UserController {
       });
     } catch (error) {
       console.error("Error in deleteUser:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // PUT /api/users/:id/restore - Restore deleted user
+  static async restoreUser(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user ID",
+        });
+      }
+
+      const user = await User.update(parseInt(id), { isDeleted: false });
+
+      res.json({
+        success: true,
+        data: { user },
+        message: "User restored successfully",
+      });
+    } catch (error) {
+      console.error("Error in restoreUser:", error);
+
+      if (error.message === "User not found") {
+        return res.status(404).json({
+          success: false,
+          message: error.message,
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Internal server error",

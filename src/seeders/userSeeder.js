@@ -6,6 +6,19 @@ async function seedUsers() {
 
   const sampleUsers = [
     {
+      username: "admin",
+      email: "admin@amsral.com",
+      firstName: "Admin",
+      lastName: "User",
+      passwordHash:
+        "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // admin123
+      phone: "+94771234567",
+      dateOfBirth: "1985-01-01",
+      roleId: 1,
+      isActive: true,
+    },
+    {
+      username: "john.doe",
       email: "john.doe@example.com",
       firstName: "John",
       lastName: "Doe",
@@ -14,6 +27,7 @@ async function seedUsers() {
       dateOfBirth: "1990-05-15",
     },
     {
+      username: "jane.smith",
       email: "jane.smith@example.com",
       firstName: "Jane",
       lastName: "Smith",
@@ -22,6 +36,7 @@ async function seedUsers() {
       dateOfBirth: "1992-08-22",
     },
     {
+      username: "bob.wilson",
       email: "bob.wilson@example.com",
       firstName: "Bob",
       lastName: "Wilson",
@@ -30,6 +45,7 @@ async function seedUsers() {
       dateOfBirth: "1988-12-03",
     },
     {
+      username: "alice.brown",
       email: "alice.brown@example.com",
       firstName: "Alice",
       lastName: "Brown",
@@ -38,6 +54,7 @@ async function seedUsers() {
       dateOfBirth: "1995-03-18",
     },
     {
+      username: "charlie.davis",
       email: "charlie.davis@example.com",
       firstName: "Charlie",
       lastName: "Davis",

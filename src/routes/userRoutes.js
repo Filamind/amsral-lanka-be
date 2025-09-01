@@ -21,6 +21,9 @@ router.post("/", UserController.createUser);
 // PUT /api/users/:id - Update user
 router.put("/:id", UserController.updateUser);
 
+// PUT /api/users/:id/restore - Restore deleted user
+router.put("/:id/restore", UserController.restoreUser);
+
 // DELETE /api/users/:id - Delete user (soft delete)
 router.delete("/:id", UserController.deleteUser);
 
