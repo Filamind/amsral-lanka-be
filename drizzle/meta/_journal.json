@@ -50,6 +50,34 @@
       "when": 1756740904834,
       "tag": "0006_elite_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1757079327041,
+      "tag": "0007_right_morgan_stark",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1757084916482,
+      "tag": "0008_remarkable_ink",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1757085985126,
+      "tag": "0009_yellow_thunderball",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1757087790573,
+      "tag": "0010_light_proteus",
+      "breakpoints": true
     }
   ]
 }

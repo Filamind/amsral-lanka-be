@@ -1,8 +1,8 @@
-const WashingType = require("../models/WashingType");
+const ProcessType = require("../models/ProcessType");
 
-class WashingTypeController {
-  // GET /api/washing-types - Get all washing types with pagination
-  static async getWashingTypes(req, res) {
+class ProcessTypeController {
+  // GET /api/process-types - Get all process types with pagination
+  static async getProcessTypes(req, res) {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
@@ -27,9 +27,15 @@ class WashingTypeController {
         });
       }
 
-      const [washingTypeList, totalCount] = await Promise.all([
-        WashingType.findAll({ limit, offset, search, sortBy, sortOrder }),
-        WashingType.count({ search }),
+      const [processTypeList, totalCount] = await Promise.all([
+        ProcessType.findAll({
+          limit,
+          offset,
+          search,
+          sortBy,
+          sortOrder,
+        }),
+        ProcessType.count({ search }),
       ]);
 
       const totalPages = Math.ceil(totalCount / limit);
@@ -37,7 +43,7 @@ class WashingTypeController {
       res.json({
         success: true,
         data: {
-          washingTypes: washingTypeList,
+          processTypes: processTypeList,
           pagination: {
             currentPage: page,
             totalPages,
@@ -47,7 +53,7 @@ class WashingTypeController {
         },
       });
     } catch (error) {
-      console.error("Error in getWashingTypes:", error);
+      console.error("Error in getProcessTypes:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -57,8 +63,8 @@ class WashingTypeController {
     }
   }
 
-  // GET /api/washing-types/:id - Get washing type by ID
-  static async getWashingTypeById(req, res) {
+  // GET /api/process-types/:id - Get process type by ID
+  static async getProcessTypeById(req, res) {
     try {
       const { id } = req.params;
 
@@ -66,25 +72,25 @@ class WashingTypeController {
       if (isNaN(id)) {
         return res.status(400).json({
           success: false,
-          message: "Invalid washing type ID",
+          message: "Invalid process type ID",
         });
       }
 
-      const washingType = await WashingType.findById(parseInt(id));
+      const processType = await ProcessType.findById(parseInt(id));
 
-      if (!washingType) {
+      if (!processType) {
         return res.status(404).json({
           success: false,
-          message: "Washing type not found",
+          message: "Process type not found",
         });
       }
 
       res.json({
         success: true,
-        data: { washingType },
+        data: processType,
       });
     } catch (error) {
-      console.error("Error in getWashingTypeById:", error);
+      console.error("Error in getProcessTypeById:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -94,33 +100,33 @@ class WashingTypeController {
     }
   }
 
-  // GET /api/washing-types/code/:code - Get washing type by code
-  static async getWashingTypeByCode(req, res) {
+  // GET /api/process-types/code/:code - Get process type by code
+  static async getProcessTypeByCode(req, res) {
     try {
       const { code } = req.params;
 
       if (!code || code.trim().length === 0) {
         return res.status(400).json({
           success: false,
-          message: "Washing type code is required",
+          message: "Process type code is required",
         });
       }
 
-      const washingType = await WashingType.findByCode(code.trim());
+      const processType = await ProcessType.findByCode(code.trim());
 
-      if (!washingType) {
+      if (!processType) {
         return res.status(404).json({
           success: false,
-          message: "Washing type not found",
+          message: "Process type not found",
         });
       }
 
       res.json({
         success: true,
-        data: { washingType },
+        data: processType,
       });
     } catch (error) {
-      console.error("Error in getWashingTypeByCode:", error);
+      console.error("Error in getProcessTypeByCode:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -130,35 +136,13 @@ class WashingTypeController {
     }
   }
 
-  // GET /api/washing-types/stats - Get washing type statistics
-  static async getWashingTypeStats(req, res) {
-    try {
-      const totalWashingTypes = await WashingType.count();
-
-      res.json({
-        success: true,
-        data: {
-          total: totalWashingTypes,
-        },
-      });
-    } catch (error) {
-      console.error("Error in getWashingTypeStats:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
-    }
-  }
-
-  // POST /api/washing-types - Create new washing type
-  static async createWashingType(req, res) {
+  // POST /api/process-types - Create new process type
+  static async createProcessType(req, res) {
     try {
       const { name, code, description } = req.body;
 
       // Validate input data
-      const validation = WashingType.validateWashingTypeData({
+      const validation = ProcessType.validateProcessTypeData({
         name,
         code,
         description,
@@ -171,31 +155,38 @@ class WashingTypeController {
         });
       }
 
-      const washingTypeData = {
+      const processTypeData = {
         name: name.trim(),
         code: code.trim(),
         description: description?.trim() || null,
       };
 
-      const washingType = await WashingType.create(washingTypeData);
+      const processType = await ProcessType.create(processTypeData);
 
       res.status(201).json({
         success: true,
-        message: "Washing type created successfully",
-        data: washingType,
+        message: "Process type created successfully",
+        data: processType,
       });
     } catch (error) {
-      console.error("Error in createWashingType:", error);
+      console.error("Error in createProcessType:", error);
 
-      if (
-        error.message === "Washing type code already exists" ||
-        error.message === "Washing type name already exists"
-      ) {
+      if (error.message === "Process type code already exists") {
         return res.status(409).json({
           success: false,
           message: "Validation failed",
           errors: {
-            [error.message.includes("code") ? "code" : "name"]: error.message,
+            code_unique: "Process type code already exists",
+          },
+        });
+      }
+
+      if (error.message === "Process type name already exists") {
+        return res.status(409).json({
+          success: false,
+          message: "Validation failed",
+          errors: {
+            name_unique: "Process type name already exists",
           },
         });
       }
@@ -209,8 +200,8 @@ class WashingTypeController {
     }
   }
 
-  // PUT /api/washing-types/:id - Update existing washing type
-  static async updateWashingType(req, res) {
+  // PUT /api/process-types/:id - Update existing process type
+  static async updateProcessType(req, res) {
     try {
       const { id } = req.params;
       const { name, code, description } = req.body;
@@ -219,12 +210,12 @@ class WashingTypeController {
       if (isNaN(id)) {
         return res.status(400).json({
           success: false,
-          message: "Invalid washing type ID",
+          message: "Invalid process type ID",
         });
       }
 
       // Validate input data
-      const validation = WashingType.validateWashingTypeData(
+      const validation = ProcessType.validateProcessTypeData(
         { name, code, description },
         true
       );
@@ -242,32 +233,39 @@ class WashingTypeController {
       if (description !== undefined)
         updateData.description = description?.trim() || null;
 
-      const washingType = await WashingType.update(parseInt(id), updateData);
+      const processType = await ProcessType.update(parseInt(id), updateData);
 
       res.json({
         success: true,
-        message: "Washing type updated successfully",
-        data: washingType,
+        message: "Process type updated successfully",
+        data: processType,
       });
     } catch (error) {
-      console.error("Error in updateWashingType:", error);
+      console.error("Error in updateProcessType:", error);
 
-      if (error.message === "Washing type not found") {
+      if (error.message === "Process type not found") {
         return res.status(404).json({
           success: false,
-          message: "Washing type not found",
+          message: "Process type not found",
         });
       }
 
-      if (
-        error.message === "Washing type code already exists" ||
-        error.message === "Washing type name already exists"
-      ) {
+      if (error.message === "Process type code already exists") {
         return res.status(409).json({
           success: false,
           message: "Validation failed",
           errors: {
-            [error.message.includes("code") ? "code" : "name"]: error.message,
+            code_unique: "Process type code already exists",
+          },
+        });
+      }
+
+      if (error.message === "Process type name already exists") {
+        return res.status(409).json({
+          success: false,
+          message: "Validation failed",
+          errors: {
+            name_unique: "Process type name already exists",
           },
         });
       }
@@ -281,8 +279,8 @@ class WashingTypeController {
     }
   }
 
-  // DELETE /api/washing-types/:id - Delete washing type
-  static async deleteWashingType(req, res) {
+  // DELETE /api/process-types/:id - Delete process type
+  static async deleteProcessType(req, res) {
     try {
       const { id } = req.params;
 
@@ -290,34 +288,23 @@ class WashingTypeController {
       if (isNaN(id)) {
         return res.status(400).json({
           success: false,
-          message: "Invalid washing type ID",
+          message: "Invalid process type ID",
         });
       }
 
-      await WashingType.delete(parseInt(id));
+      await ProcessType.delete(parseInt(id));
 
       res.json({
         success: true,
-        message: "Washing type deleted successfully",
+        message: "Process type deleted successfully",
       });
     } catch (error) {
-      console.error("Error in deleteWashingType:", error);
+      console.error("Error in deleteProcessType:", error);
 
-      if (error.message === "Washing type not found") {
+      if (error.message === "Process type not found") {
         return res.status(404).json({
           success: false,
-          message: "Washing type not found",
-        });
-      }
-
-      if (
-        error.message ===
-        "Cannot delete washing type. It is being used in existing processes."
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Cannot delete washing type. It is being used in existing processes.",
+          message: "Process type not found",
         });
       }
 
@@ -330,13 +317,35 @@ class WashingTypeController {
     }
   }
 
-  // GET /api/washing-types/list - Get all washing types in simple format (for dropdowns/selects)
-  static async getWashingTypesList(req, res) {
+  // GET /api/process-types/stats - Get process type statistics
+  static async getProcessTypeStats(req, res) {
+    try {
+      const totalProcessTypes = await ProcessType.count();
+
+      res.json({
+        success: true,
+        data: {
+          total: totalProcessTypes,
+        },
+      });
+    } catch (error) {
+      console.error("Error in getProcessTypeStats:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // GET /api/process-types/list - Get all process types in simple format (for dropdowns/selects)
+  static async getProcessTypesList(req, res) {
     try {
       const search = req.query.search;
 
-      const washingTypes = await WashingType.findAll({
-        limit: 1000, // Get all washing types for dropdown
+      const processTypes = await ProcessType.findAll({
+        limit: 1000, // Get all process types for dropdown
         offset: 0,
         search,
         sortBy: "name",
@@ -344,43 +353,21 @@ class WashingTypeController {
       });
 
       // Format response for frontend dropdowns
-      const washingTypesList = washingTypes.map((washingType) => ({
-        id: washingType.id,
-        value: washingType.id,
-        label: `${washingType.name} (${washingType.code})`,
-        name: washingType.name,
-        code: washingType.code,
-        description: washingType.description,
+      const processTypesList = processTypes.map((processType) => ({
+        id: processType.id,
+        value: processType.id,
+        label: processType.name,
+        name: processType.name,
+        code: processType.code,
+        description: processType.description,
       }));
 
       res.json({
         success: true,
-        data: washingTypesList,
+        data: processTypesList,
       });
     } catch (error) {
-      console.error("Error in getWashingTypesList:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
-    }
-  }
-
-  // GET /api/washing-types/predefined - Get predefined washing types
-  static async getPredefinedWashingTypes(req, res) {
-    try {
-      const predefinedWashingTypes = WashingType.getPredefinedWashingTypes();
-
-      res.json({
-        success: true,
-        data: {
-          washingTypes: predefinedWashingTypes,
-        },
-      });
-    } catch (error) {
-      console.error("Error in getPredefinedWashingTypes:", error);
+      console.error("Error in getProcessTypesList:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -391,4 +378,4 @@ class WashingTypeController {
   }
 }
 
-module.exports = WashingTypeController;
+module.exports = ProcessTypeController;

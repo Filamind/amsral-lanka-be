@@ -352,6 +352,50 @@ class ItemTypeController {
     }
   }
 
+  // GET /api/item-types/list - Get all item types in simple format (for dropdowns/selects)
+  static async getItemTypesList(req, res) {
+    try {
+      const isActive =
+        req.query.active !== undefined ? req.query.active === "true" : true;
+      const search = req.query.search;
+      const category = req.query.category;
+
+      const itemTypes = await ItemType.findAll({
+        limit: 1000, // Get all item types for dropdown
+        offset: 0,
+        isActive,
+        search,
+        category,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+
+      // Format response for frontend dropdowns
+      const itemTypesList = itemTypes.map((itemType) => ({
+        id: itemType.code, // Use code as ID for orders
+        value: itemType.code,
+        label: itemType.name,
+        itemName: itemType.name,
+        itemCode: itemType.code,
+        category: itemType.category,
+        description: itemType.description,
+      }));
+
+      res.json({
+        success: true,
+        data: itemTypesList,
+      });
+    } catch (error) {
+      console.error("Error in getItemTypesList:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
   // GET /api/item-types/predefined - Get predefined item types
   static async getPredefinedItemTypes(req, res) {
     try {

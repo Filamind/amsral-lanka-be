@@ -6,6 +6,9 @@ const router = express.Router();
 // GET /api/customers - Get all customers with pagination and filtering
 router.get("/", CustomerController.getCustomers);
 
+// GET /api/customers/list - Get customers list for dropdowns/selects
+router.get("/list", CustomerController.getCustomersList);
+
 // GET /api/customers/generate-code - Generate next customer code
 router.get("/generate-code", CustomerController.generateCustomerCode);
 

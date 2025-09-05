@@ -393,6 +393,48 @@ class CustomerController {
     }
   }
 
+  // GET /api/customers/list - Get all customers in simple format (for dropdowns/selects)
+  static async getCustomersList(req, res) {
+    try {
+      const isActive =
+        req.query.active !== undefined ? req.query.active === "true" : true;
+      const search = req.query.search;
+
+      const customers = await Customer.findAll({
+        limit: 1000, // Get all customers for dropdown
+        offset: 0,
+        isActive,
+        search,
+        sortBy: "firstName",
+        sortOrder: "asc",
+      });
+
+      // Format response for frontend dropdowns
+      const customersList = customers.map((customer) => ({
+        id: customer.customerCode, // Use customerCode as ID for orders
+        value: customer.customerCode,
+        label: `${customer.firstName} ${customer.lastName}`,
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        customerCode: customer.customerCode,
+        email: customer.email,
+        phone: customer.phone,
+      }));
+
+      res.json({
+        success: true,
+        data: customersList,
+      });
+    } catch (error) {
+      console.error("Error in getCustomersList:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
   // GET /api/customers/generate-code - Generate next customer code
   static async generateCustomerCode(req, res) {
     try {
