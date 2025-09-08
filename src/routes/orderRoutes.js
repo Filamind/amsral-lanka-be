@@ -1,7 +1,12 @@
 const express = require("express");
 const OrderController = require("../controllers/orderController");
-
 const router = express.Router();
+
+// PUT /api/orders/:orderId/records/:recordId - Update order record
+router.put("/:orderId/records/:recordId", OrderController.updateOrderRecord);
+
+// DELETE /api/orders/:orderId/records/:recordId - Delete order record
+router.delete("/:orderId/records/:recordId", OrderController.deleteOrderRecord);
 
 // GET /api/orders - Get all orders with pagination and search
 router.get("/", OrderController.getAllOrders);
@@ -17,6 +22,9 @@ router.get("/:id", OrderController.getOrderById);
 
 // POST /api/orders - Create new order
 router.post("/", OrderController.createOrder);
+
+// POST /api/orders/:orderId/records - Add order record
+router.post("/:orderId/records", OrderController.addOrderRecord);
 
 // PUT /api/orders/:id - Update order
 router.put("/:id", OrderController.updateOrder);

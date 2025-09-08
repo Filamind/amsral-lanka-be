@@ -3,6 +3,186 @@ const OrderRecord = require("../models/OrderRecord");
 const { db } = require("../config/db");
 
 class OrderController {
+  // PUT /api/orders/:orderId/records/:recordId - Update order record
+  static async updateOrderRecord(req, res) {
+    try {
+      const { orderId, recordId } = req.params;
+      const { itemId, quantity, washType, processTypes } = req.body;
+
+      // Basic validation
+      const errors = {};
+      if (!itemId) errors.itemId = "Item ID is required";
+      if (!quantity || quantity <= 0)
+        errors.quantity = "Quantity must be greater than 0";
+      if (!washType) errors.washType = "Wash type is required";
+      if (
+        !processTypes ||
+        !Array.isArray(processTypes) ||
+        processTypes.length === 0
+      )
+        errors.processTypes = "Process types are required";
+
+      if (Object.keys(errors).length > 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Validation failed", errors });
+      }
+
+      // Check if order exists
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found" });
+      }
+
+      // Check if record exists
+      const record = await OrderRecord.findById(recordId);
+      if (!record || record.orderId != orderId) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order record not found" });
+      }
+
+      // Update record
+      const updateData = {
+        itemId,
+        quantity: parseInt(quantity),
+        washType,
+        processTypes,
+      };
+      try {
+        const updated = await OrderRecord.update(recordId, updateData);
+        res.json({
+          success: true,
+          data: {
+            id: updated.id,
+            orderId: updated.orderId,
+            itemId: updated.itemId,
+            quantity: updated.quantity,
+            washType: updated.washType,
+            processTypes: updated.processTypes,
+            createdAt: updated.createdAt,
+            updatedAt: updated.updatedAt,
+          },
+        });
+      } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+      }
+    } catch (error) {
+      console.error("Error updating order record:", error);
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Internal server error",
+          error: error.message,
+        });
+    }
+  }
+
+  // DELETE /api/orders/:orderId/records/:recordId - Delete order record
+  static async deleteOrderRecord(req, res) {
+    try {
+      const { orderId, recordId } = req.params;
+
+      // Check if order exists
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found" });
+      }
+
+      // Check if record exists
+      const record = await OrderRecord.findById(recordId);
+      if (!record || record.orderId != orderId) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order record not found" });
+      }
+
+      await OrderRecord.delete(recordId);
+      res.json({ success: true, message: "Record deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting order record:", error);
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Internal server error",
+          error: error.message,
+        });
+    }
+  }
+  // POST /api/orders/:orderId/records - Add order record
+  static async addOrderRecord(req, res) {
+    try {
+      const { orderId } = req.params;
+      const { itemId, quantity, washType, processTypes } = req.body;
+
+      // Basic validation
+      const errors = {};
+      if (!itemId) errors.itemId = "Item ID is required";
+      if (!quantity || quantity <= 0)
+        errors.quantity = "Quantity must be greater than 0";
+      if (!washType) errors.washType = "Wash type is required";
+      if (
+        !processTypes ||
+        !Array.isArray(processTypes) ||
+        processTypes.length === 0
+      )
+        errors.processTypes = "Process types are required";
+
+      if (Object.keys(errors).length > 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Validation failed", errors });
+      }
+
+      // Check if order exists
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Order not found" });
+      }
+
+      // Create record
+      const recordData = {
+        orderId: parseInt(orderId),
+        itemId,
+        quantity: parseInt(quantity),
+        washType,
+        processTypes,
+      };
+      try {
+        const record = await OrderRecord.create(recordData);
+        res.status(201).json({
+          success: true,
+          data: {
+            id: record.id,
+            orderId: record.orderId,
+            itemId: record.itemId,
+            quantity: record.quantity,
+            washType: record.washType,
+            processTypes: record.processTypes,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+          },
+        });
+      } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+      }
+    } catch (error) {
+      console.error("Error adding order record:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
   // GET /api/orders - Get all orders with pagination and search
   static async getAllOrders(req, res) {
     try {
@@ -29,10 +209,28 @@ class OrderController {
       const totalRecords = await Order.count(options);
       const totalPages = Math.ceil(totalRecords / parseInt(limit));
 
+      // Format orders for response
+      const formattedOrders = orders.map((order) => ({
+        id: order.id,
+        date: order.date,
+        referenceNo: order.referenceNo,
+        customerId: order.customerId,
+        customerName: order.customerName,
+        itemId: order.itemId || null,
+        itemName: order.itemName || null,
+        quantity: order.quantity,
+        notes: order.notes,
+        deliveryDate: order.deliveryDate,
+        status: order.status,
+        recordsCount: order.recordsCount || 0,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        records: [],
+      }));
       res.json({
         success: true,
         data: {
-          orders,
+          orders: formattedOrders,
           pagination: {
             currentPage: parseInt(page),
             totalPages,
@@ -55,7 +253,6 @@ class OrderController {
   static async getOrderById(req, res) {
     try {
       const { id } = req.params;
-
       const order = await Order.findById(id);
       if (!order) {
         return res.status(404).json({
@@ -63,15 +260,37 @@ class OrderController {
           message: "Order not found",
         });
       }
-
       // Get records for this order
       const records = await OrderRecord.findByOrderId(id);
-
+      // Format records as per response spec
+      const formattedRecords = records.map((rec) => ({
+        id: rec.id,
+        orderId: rec.orderId,
+        itemId: rec.itemId || null,
+        quantity: rec.quantity,
+        washType: rec.washType,
+        processTypes: rec.processTypes,
+        createdAt: rec.createdAt,
+        updatedAt: rec.updatedAt,
+      }));
       res.json({
         success: true,
         data: {
-          ...order,
-          records,
+          id: order.id,
+          date: order.date,
+          referenceNo: order.referenceNo,
+          customerId: order.customerId,
+          customerName: order.customerName,
+          itemId: order.itemId || null,
+          itemName: order.itemName || null,
+          quantity: order.quantity,
+          notes: order.notes,
+          deliveryDate: order.deliveryDate,
+          status: order.status,
+          recordsCount: formattedRecords.length,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          records: formattedRecords,
         },
       });
     } catch (error) {
