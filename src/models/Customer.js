@@ -92,7 +92,7 @@ class Customer {
         offset = 0,
         isActive = null,
         search = null,
-        city = null,
+        mapLink = null,
         country = null,
         sortBy = "createdAt",
         sortOrder = "desc",
@@ -117,8 +117,8 @@ class Customer {
         );
       }
 
-      if (city) {
-        conditions.push(ilike(customers.city, `%${city}%`));
+      if (mapLink) {
+        conditions.push(ilike(customers.mapLink, `%${mapLink}%`));
       }
 
       if (country) {
@@ -153,7 +153,7 @@ class Customer {
       const {
         isActive = null,
         search = null,
-        city = null,
+        mapLink = null,
         country = null,
       } = options;
 
@@ -176,8 +176,8 @@ class Customer {
         );
       }
 
-      if (city) {
-        conditions.push(ilike(customers.city, `%${city}%`));
+      if (mapLink) {
+        conditions.push(ilike(customers.mapLink, `%${mapLink}%`));
       }
 
       if (country) {
@@ -249,7 +249,7 @@ class Customer {
       const [customer] = await db
         .update(customers)
         .set({
-          isActive: false,
+          isDeleted: true,
           updatedAt: new Date(),
         })
         .where(eq(customers.id, id))
@@ -306,8 +306,8 @@ class Customer {
     }
   }
 
-  // Get customers by city
-  static async findByCity(city, options = {}) {
+  // Get customers by map link
+  static async findByMapLink(mapLink, options = {}) {
     try {
       const { limit = 10, offset = 0 } = options;
 
@@ -315,7 +315,11 @@ class Customer {
         .select()
         .from(customers)
         .where(
-          and(eq(customers.isActive, true), ilike(customers.city, `%${city}%`))
+          and(
+            eq(customers.isActive, true),
+            eq(customers.isDeleted, false),
+            ilike(customers.mapLink, `%${mapLink}%`)
+          )
         )
         .orderBy(desc(customers.createdAt))
         .limit(limit)
@@ -323,7 +327,7 @@ class Customer {
 
       return customerList;
     } catch (error) {
-      console.error("Error finding customers by city:", error);
+      console.error("Error finding customers by map link:", error);
       throw error;
     }
   }
@@ -339,6 +343,7 @@ class Customer {
         .where(
           and(
             eq(customers.isActive, true),
+            eq(customers.isDeleted, false),
             ilike(customers.country, `%${country}%`)
           )
         )

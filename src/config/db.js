@@ -8,9 +8,9 @@ const {
   dryingTypes,
   customers,
   itemTypes,
-  customerOrders,
-  customerOrderLines,
-  customerOrderLineProcesses,
+  orders,
+  orderRecords,
+  machineAssignments,
 } = require("../db/schema");
 require("dotenv").config();
 
@@ -41,9 +41,9 @@ const db = drizzle(pool, {
     dryingTypes,
     customers,
     itemTypes,
-    customerOrders,
-    customerOrderLines,
-    customerOrderLineProcesses,
+    orders,
+    orderRecords,
+    machineAssignments,
   },
 });
 

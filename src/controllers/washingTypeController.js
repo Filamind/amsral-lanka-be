@@ -6,9 +6,9 @@ class WashingTypeController {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
-      const isActive =
-        req.query.active !== undefined ? req.query.active === "true" : null;
       const search = req.query.search;
+      const sortBy = req.query.sortBy || "createdAt";
+      const sortOrder = req.query.sortOrder || "desc";
 
       const offset = (page - 1) * limit;
 
@@ -27,9 +27,9 @@ class WashingTypeController {
         });
       }
 
-      const [washingTypes, totalCount] = await Promise.all([
-        WashingType.findAll({ limit, offset, isActive, search }),
-        WashingType.count({ isActive, search }),
+      const [washingTypeList, totalCount] = await Promise.all([
+        WashingType.findAll({ limit, offset, search, sortBy, sortOrder }),
+        WashingType.count({ search }),
       ]);
 
       const totalPages = Math.ceil(totalCount / limit);
@@ -37,14 +37,12 @@ class WashingTypeController {
       res.json({
         success: true,
         data: {
-          washingTypes,
+          washingTypes: washingTypeList,
           pagination: {
             currentPage: page,
             totalPages,
-            totalItems: totalCount,
-            itemsPerPage: limit,
-            hasNextPage: page < totalPages,
-            hasPrevPage: page > 1,
+            totalRecords: totalCount,
+            limit,
           },
         },
       });
@@ -135,19 +133,12 @@ class WashingTypeController {
   // GET /api/washing-types/stats - Get washing type statistics
   static async getWashingTypeStats(req, res) {
     try {
-      const [totalWashingTypes, activeWashingTypes, inactiveWashingTypes] =
-        await Promise.all([
-          WashingType.count(),
-          WashingType.count({ isActive: true }),
-          WashingType.count({ isActive: false }),
-        ]);
+      const totalWashingTypes = await WashingType.count();
 
       res.json({
         success: true,
         data: {
           total: totalWashingTypes,
-          active: activeWashingTypes,
-          inactive: inactiveWashingTypes,
         },
       });
     } catch (error) {
@@ -166,11 +157,17 @@ class WashingTypeController {
     try {
       const { name, code, description } = req.body;
 
-      // Validate required fields
-      if (!name || !code) {
+      // Validate input data
+      const validation = WashingType.validateWashingTypeData({
+        name,
+        code,
+        description,
+      });
+      if (!validation.isValid) {
         return res.status(400).json({
           success: false,
-          message: "Name and code are required",
+          message: "Validation failed",
+          errors: validation.errors,
         });
       }
 
@@ -184,19 +181,184 @@ class WashingTypeController {
 
       res.status(201).json({
         success: true,
-        data: { washingType },
         message: "Washing type created successfully",
+        data: washingType,
       });
     } catch (error) {
       console.error("Error in createWashingType:", error);
 
-      if (error.message === "Washing type code already exists") {
+      if (
+        error.message === "Washing type code already exists" ||
+        error.message === "Washing type name already exists"
+      ) {
         return res.status(409).json({
           success: false,
-          message: error.message,
+          message: "Validation failed",
+          errors: {
+            [error.message.includes("code") ? "code" : "name"]: error.message,
+          },
         });
       }
 
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // PUT /api/washing-types/:id - Update existing washing type
+  static async updateWashingType(req, res) {
+    try {
+      const { id } = req.params;
+      const { name, code, description } = req.body;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid washing type ID",
+        });
+      }
+
+      // Validate input data
+      const validation = WashingType.validateWashingTypeData(
+        { name, code, description },
+        true
+      );
+      if (!validation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: validation.errors,
+        });
+      }
+
+      const updateData = {};
+      if (name !== undefined) updateData.name = name.trim();
+      if (code !== undefined) updateData.code = code.trim();
+      if (description !== undefined)
+        updateData.description = description?.trim() || null;
+
+      const washingType = await WashingType.update(parseInt(id), updateData);
+
+      res.json({
+        success: true,
+        message: "Washing type updated successfully",
+        data: washingType,
+      });
+    } catch (error) {
+      console.error("Error in updateWashingType:", error);
+
+      if (error.message === "Washing type not found") {
+        return res.status(404).json({
+          success: false,
+          message: "Washing type not found",
+        });
+      }
+
+      if (
+        error.message === "Washing type code already exists" ||
+        error.message === "Washing type name already exists"
+      ) {
+        return res.status(409).json({
+          success: false,
+          message: "Validation failed",
+          errors: {
+            [error.message.includes("code") ? "code" : "name"]: error.message,
+          },
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // DELETE /api/washing-types/:id - Delete washing type
+  static async deleteWashingType(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid washing type ID",
+        });
+      }
+
+      await WashingType.delete(parseInt(id));
+
+      res.json({
+        success: true,
+        message: "Washing type deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error in deleteWashingType:", error);
+
+      if (error.message === "Washing type not found") {
+        return res.status(404).json({
+          success: false,
+          message: "Washing type not found",
+        });
+      }
+
+      if (
+        error.message ===
+        "Cannot delete washing type. It is being used in existing processes."
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Cannot delete washing type. It is being used in existing processes.",
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // GET /api/washing-types/list - Get all washing types in simple format (for dropdowns/selects)
+  static async getWashingTypesList(req, res) {
+    try {
+      const search = req.query.search;
+
+      const washingTypes = await WashingType.findAll({
+        limit: 1000, // Get all washing types for dropdown
+        offset: 0,
+        search,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+
+      // Format response for frontend dropdowns
+      const washingTypesList = washingTypes.map((washingType) => ({
+        id: washingType.id,
+        value: washingType.id,
+        label: `${washingType.name} (${washingType.code})`,
+        name: washingType.name,
+        code: washingType.code,
+        description: washingType.description,
+      }));
+
+      res.json({
+        success: true,
+        data: washingTypesList,
+      });
+    } catch (error) {
+      console.error("Error in getWashingTypesList:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

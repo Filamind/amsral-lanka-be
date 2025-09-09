@@ -6,6 +6,9 @@ const router = express.Router();
 // GET /api/washing-types - Get all washing types with pagination and filtering
 router.get("/", WashingTypeController.getWashingTypes);
 
+// GET /api/washing-types/list - Get washing types list for dropdowns/selects
+router.get("/list", WashingTypeController.getWashingTypesList);
+
 // GET /api/washing-types/predefined - Get predefined washing types
 router.get("/predefined", WashingTypeController.getPredefinedWashingTypes);
 
@@ -20,5 +23,11 @@ router.get("/:id", WashingTypeController.getWashingTypeById);
 
 // POST /api/washing-types - Create new washing type
 router.post("/", WashingTypeController.createWashingType);
+
+// PUT /api/washing-types/:id - Update existing washing type
+router.put("/:id", WashingTypeController.updateWashingType);
+
+// DELETE /api/washing-types/:id - Delete washing type
+router.delete("/:id", WashingTypeController.deleteWashingType);
 
 module.exports = router;

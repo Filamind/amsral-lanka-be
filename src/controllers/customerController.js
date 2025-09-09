@@ -9,7 +9,7 @@ class CustomerController {
       const isActive =
         req.query.active !== undefined ? req.query.active === "true" : null;
       const search = req.query.search;
-      const city = req.query.city;
+      const mapLink = req.query.mapLink;
       const country = req.query.country;
       const sortBy = req.query.sortBy || "createdAt";
       const sortOrder = req.query.sortOrder || "desc";
@@ -37,12 +37,12 @@ class CustomerController {
           offset,
           isActive,
           search,
-          city,
+          mapLink,
           country,
           sortBy,
           sortOrder,
         }),
-        Customer.count({ isActive, search, city, country }),
+        Customer.count({ isActive, search, mapLink, country }),
       ]);
 
       const totalPages = Math.ceil(totalCount / limit);
@@ -184,7 +184,7 @@ class CustomerController {
         email,
         phone,
         address,
-        city,
+        mapLink,
         postalCode,
         country,
         dateOfBirth,
@@ -212,7 +212,7 @@ class CustomerController {
         email: email?.trim() || null,
         phone: phone.trim(),
         address: address?.trim() || null,
-        city: city?.trim() || null,
+        mapLink: mapLink?.trim() || null,
         postalCode: postalCode?.trim() || null,
         country: country?.trim() || null,
         dateOfBirth: dateOfBirth || null,
@@ -337,22 +337,25 @@ class CustomerController {
     }
   }
 
-  // GET /api/customers/city/:city - Get customers by city
-  static async getCustomersByCity(req, res) {
+  // GET /api/customers/maplink/:maplink - Get customers by map link
+  static async getCustomersByMapLink(req, res) {
     try {
-      const { city } = req.params;
+      const { maplink } = req.params;
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const offset = (page - 1) * limit;
 
-      const customers = await Customer.findByCity(city, { limit, offset });
+      const customers = await Customer.findByMapLink(maplink, {
+        limit,
+        offset,
+      });
 
       res.json({
         success: true,
         data: { customers },
       });
     } catch (error) {
-      console.error("Error in getCustomersByCity:", error);
+      console.error("Error in getCustomersByMapLink:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -381,6 +384,48 @@ class CustomerController {
       });
     } catch (error) {
       console.error("Error in getCustomersByCountry:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // GET /api/customers/list - Get all customers in simple format (for dropdowns/selects)
+  static async getCustomersList(req, res) {
+    try {
+      const isActive =
+        req.query.active !== undefined ? req.query.active === "true" : true;
+      const search = req.query.search;
+
+      const customers = await Customer.findAll({
+        limit: 1000, // Get all customers for dropdown
+        offset: 0,
+        isActive,
+        search,
+        sortBy: "firstName",
+        sortOrder: "asc",
+      });
+
+      // Format response for frontend dropdowns
+      const customersList = customers.map((customer) => ({
+        id: customer.customerCode, // Use customerCode as ID for orders
+        value: customer.customerCode,
+        label: `${customer.firstName} ${customer.lastName}`,
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        customerCode: customer.customerCode,
+        email: customer.email,
+        phone: customer.phone,
+      }));
+
+      res.json({
+        success: true,
+        data: customersList,
+      });
+    } catch (error) {
+      console.error("Error in getCustomersList:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

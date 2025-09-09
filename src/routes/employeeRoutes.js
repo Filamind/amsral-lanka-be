@@ -31,7 +31,14 @@ router.get(
 router.get("/email/:email", EmployeeController.getEmployeeByEmail);
 
 // POST /api/employees - Create new employee
+// POST /api/employees - Create new employee
 router.post("/", EmployeeController.createEmployee);
+
+// PUT /api/employees/:id - Update employee
+router.put("/:id", EmployeeController.updateEmployee);
+
+// DELETE /api/employees/:id - Delete employee (soft delete)
+router.delete("/:id", EmployeeController.deleteEmployee);
 
 // GET /api/employees/:id - Get employee by ID (should be last to avoid conflicts)
 router.get("/:id", EmployeeController.getEmployeeById);

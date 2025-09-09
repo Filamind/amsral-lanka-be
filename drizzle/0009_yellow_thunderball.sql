@@ -1,0 +1,1 @@
+ALTER TABLE "washing_types" DROP COLUMN "is_active";

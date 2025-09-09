@@ -6,6 +6,9 @@ const router = express.Router();
 // GET /api/item-types - Get all item types with pagination and filtering
 router.get("/", ItemTypeController.getItemTypes);
 
+// GET /api/item-types/list - Get item types list for dropdowns/selects
+router.get("/list", ItemTypeController.getItemTypesList);
+
 // GET /api/item-types/predefined - Get predefined item types
 router.get("/predefined", ItemTypeController.getPredefinedItemTypes);
 

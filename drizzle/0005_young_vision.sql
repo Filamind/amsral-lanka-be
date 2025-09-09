@@ -1,0 +1,1 @@
+ALTER TABLE "customers" RENAME COLUMN "city" TO "map_link";

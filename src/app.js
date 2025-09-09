@@ -8,11 +8,18 @@ const roleRoutes = require("./routes/roleRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const washingTypeRoutes = require("./routes/washingTypeRoutes");
 const dryingTypeRoutes = require("./routes/dryingTypeRoutes");
+const machineTypeRoutes = require("./routes/machineTypeRoutes");
+const processTypeRoutes = require("./routes/processTypeRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const itemTypeRoutes = require("./routes/itemTypeRoutes");
-const customerOrderRoutes = require("./routes/customerOrderRoutes");
-const customerOrderLineRoutes = require("./routes/customerOrderLineRoutes");
-const customerOrderLineProcessRoutes = require("./routes/customerOrderLineProcessRoutes");
+const itemRoutes = require("./routes/itemRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const validationRoutes = require("./routes/validationRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const productionRoutes = require("./routes/productionRoutes");
+const referenceRoutes = require("./routes/referenceRoutes");
+const recordRoutes = require("./routes/recordRoutes");
+const machineAssignmentRoutes = require("./routes/machineAssignmentRoutes");
 
 // Import database connection
 const { pool } = require("./config/db");
@@ -20,7 +27,20 @@ const { pool } = require("./config/db");
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: true, // Allow all origins
+    credentials: true, // Allow credentials
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -56,11 +76,19 @@ app.use("/api/roles", roleRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/washing-types", washingTypeRoutes);
 app.use("/api/drying-types", dryingTypeRoutes);
+app.use("/api/machine-types", machineTypeRoutes);
+app.use("/api/process-types", processTypeRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/item-types", itemTypeRoutes);
-app.use("/api/customer-orders", customerOrderRoutes);
-app.use("/api/customer-order-lines", customerOrderLineRoutes);
-app.use("/api/customer-order-line-processes", customerOrderLineProcessRoutes);
+app.use("/api/items", itemRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/validation", validationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/production", productionRoutes);
+app.use("/api/reference", referenceRoutes);
+app.use("/api/records", machineAssignmentRoutes);
+app.use("/api/records", recordRoutes);
+app.use("/api", machineAssignmentRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -88,11 +116,33 @@ app.get("/", (req, res) => {
       positions: "/api/employees/positions",
       washingTypes: "/api/washing-types",
       dryingTypes: "/api/drying-types",
+      machineTypes: "/api/machine-types",
+      processTypes: "/api/process-types",
       customers: "/api/customers",
       itemTypes: "/api/item-types",
-      customerOrders: "/api/customer-orders",
-      customerOrderLines: "/api/customer-order-lines",
-      customerOrderLineProcesses: "/api/customer-order-line-processes",
+      items: "/api/items",
+      orders: "/api/orders",
+      orderById: "/api/orders/:id",
+      createOrder: "POST /api/orders",
+      updateOrder: "PUT /api/orders/:id",
+      deleteOrder: "DELETE /api/orders/:id",
+      washTypes: "/api/orders/wash-types",
+      processTypes: "/api/orders/process-types",
+      orderRecords: "/api/orders/records",
+      records: "/api/records/:id",
+      recordAssignments: "/api/records/:recordId/assignments",
+      createAssignment: "POST /api/records/:recordId/assignments",
+      updateAssignment: "PUT /api/records/:recordId/assignments/:assignmentId",
+      completeAssignment:
+        "PUT /api/records/:recordId/assignments/:assignmentId/complete",
+      deleteAssignment:
+        "DELETE /api/records/:recordId/assignments/:assignmentId",
+      assignmentStats: "/api/records/:recordId/assignments/stats",
+      machines: "/api/machines",
+      validation: "/api/validation",
+      dashboard: "/api/dashboard",
+      production: "/api/production",
+      reference: "/api/reference",
     },
   });
 });

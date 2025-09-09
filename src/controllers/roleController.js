@@ -203,6 +203,28 @@ class RoleController {
     }
   }
 
+  // GET /api/roles/map - Get roles as id-name map for dropdowns
+  static async getRoleMap(req, res) {
+    try {
+      const roleMap = await Role.getRoleMap();
+
+      res.json({
+        success: true,
+        data: {
+          roles: roleMap,
+        },
+      });
+    } catch (error) {
+      console.error("Error in getRoleMap:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
   // GET /api/roles/predefined - Get predefined roles
   static async getPredefinedRoles(req, res) {
     try {
