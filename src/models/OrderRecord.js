@@ -11,48 +11,40 @@ const {
   sum,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
-const { orderRecords, orders } = require("../db/schema");
+const {
+  orderRecords,
+  orders,
+  washingTypes,
+  processTypes,
+  machineAssignments,
+} = require("../db/schema");
 
 class OrderRecord {
   // Create a new order record
   static async create(recordData) {
     try {
-      // Validate wash type
-      const validWashTypes = [
-        "normal",
-        "heavy",
-        "silicon",
-        "heavy_silicon",
-        "enzyme",
-        "heavy_enzyme",
-        "dark",
-        "mid",
-        "light",
-        "sky",
-        "acid",
-        "tint",
-        "chemical",
-      ];
+      // Map numeric IDs to string values if needed
+      const mappedData = {
+        ...recordData,
+        washType: await this.mapWashTypeId(recordData.washType),
+        processTypes: await this.mapProcessTypeIds(recordData.processTypes),
+      };
 
-      if (!validWashTypes.includes(recordData.washType)) {
-        throw new Error("Invalid wash type");
+      // Validate wash type against database
+      const washTypes = await this.getWashTypes();
+      const validWashTypeCodes = washTypes.map((wt) => wt.code);
+
+      if (!validWashTypeCodes.includes(mappedData.washType)) {
+        throw new Error(`Invalid wash type: ${mappedData.washType}`);
       }
 
-      // Validate process types
-      const validProcessTypes = [
-        "reese",
-        "sand_blast",
-        "viscose",
-        "chevron",
-        "hand_sand",
-        "rib",
-        "tool",
-        "grind",
-      ];
+      // Validate process types against database
+      const processTypesList = await this.getProcessTypes();
+      const validProcessTypeCodes = processTypesList.map((pt) => pt.code);
 
-      if (recordData.processTypes && Array.isArray(recordData.processTypes)) {
-        const invalidTypes = recordData.processTypes.filter(
-          (type) => !validProcessTypes.includes(type)
+      if (mappedData.processTypes && Array.isArray(mappedData.processTypes)) {
+        const invalidTypes = mappedData.processTypes.filter(
+          (type) => !validProcessTypeCodes.includes(type)
         );
         if (invalidTypes.length > 0) {
           throw new Error(`Invalid process types: ${invalidTypes.join(", ")}`);
@@ -62,7 +54,7 @@ class OrderRecord {
       const [record] = await db
         .insert(orderRecords)
         .values({
-          ...recordData,
+          ...mappedData,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -166,7 +158,7 @@ class OrderRecord {
   // Count order records with filtering
   static async count(options = {}) {
     try {
-      const { orderId = null, washType = null } = options;
+      const { orderId = null, washType = null, search = null } = options;
 
       const conditions = [];
 
@@ -176,6 +168,10 @@ class OrderRecord {
 
       if (washType) {
         conditions.push(eq(orderRecords.washType, washType));
+      }
+
+      if (search) {
+        conditions.push(or(ilike(orderRecords.washType, `%${search}%`)));
       }
 
       const whereClause =
@@ -201,45 +197,35 @@ class OrderRecord {
         throw new Error("Order record not found");
       }
 
-      // Validate wash type if being updated
-      if (updateData.washType) {
-        const validWashTypes = [
-          "normal",
-          "heavy",
-          "silicon",
-          "heavy_silicon",
-          "enzyme",
-          "heavy_enzyme",
-          "dark",
-          "mid",
-          "light",
-          "sky",
-          "acid",
-          "tint",
-          "chemical",
-        ];
+      // Map numeric IDs to string values if needed
+      const mappedData = {
+        ...updateData,
+        washType: updateData.washType
+          ? await this.mapWashTypeId(updateData.washType)
+          : updateData.washType,
+        processTypes: updateData.processTypes
+          ? await this.mapProcessTypeIds(updateData.processTypes)
+          : updateData.processTypes,
+      };
 
-        if (!validWashTypes.includes(updateData.washType)) {
-          throw new Error("Invalid wash type");
+      // Validate wash type if being updated
+      if (mappedData.washType) {
+        const washTypes = await this.getWashTypes();
+        const validWashTypeCodes = washTypes.map((wt) => wt.code);
+
+        if (!validWashTypeCodes.includes(mappedData.washType)) {
+          throw new Error(`Invalid wash type: ${mappedData.washType}`);
         }
       }
 
       // Validate process types if being updated
-      if (updateData.processTypes) {
-        const validProcessTypes = [
-          "reese",
-          "sand_blast",
-          "viscose",
-          "chevron",
-          "hand_sand",
-          "rib",
-          "tool",
-          "grind",
-        ];
+      if (mappedData.processTypes) {
+        const processTypesList = await this.getProcessTypes();
+        const validProcessTypeCodes = processTypesList.map((pt) => pt.code);
 
-        if (Array.isArray(updateData.processTypes)) {
-          const invalidTypes = updateData.processTypes.filter(
-            (type) => !validProcessTypes.includes(type)
+        if (Array.isArray(mappedData.processTypes)) {
+          const invalidTypes = mappedData.processTypes.filter(
+            (type) => !validProcessTypeCodes.includes(type)
           );
           if (invalidTypes.length > 0) {
             throw new Error(
@@ -252,7 +238,7 @@ class OrderRecord {
       const [record] = await db
         .update(orderRecords)
         .set({
-          ...updateData,
+          ...mappedData,
           updatedAt: new Date(),
         })
         .where(eq(orderRecords.id, id))
@@ -298,42 +284,30 @@ class OrderRecord {
   // Bulk create records
   static async bulkCreate(recordsData) {
     try {
+      // Map numeric IDs to string values for all records
+      const mappedRecordsData = await Promise.all(
+        recordsData.map(async (recordData) => ({
+          ...recordData,
+          washType: await this.mapWashTypeId(recordData.washType),
+          processTypes: await this.mapProcessTypeIds(recordData.processTypes),
+        }))
+      );
+
+      // Get valid codes from database
+      const washTypes = await this.getWashTypes();
+      const processTypesList = await this.getProcessTypes();
+      const validWashTypeCodes = washTypes.map((wt) => wt.code);
+      const validProcessTypeCodes = processTypesList.map((pt) => pt.code);
+
       // Validate all records
-      const validWashTypes = [
-        "normal",
-        "heavy",
-        "silicon",
-        "heavy_silicon",
-        "enzyme",
-        "heavy_enzyme",
-        "dark",
-        "mid",
-        "light",
-        "sky",
-        "acid",
-        "tint",
-        "chemical",
-      ];
-
-      const validProcessTypes = [
-        "reese",
-        "sand_blast",
-        "viscose",
-        "chevron",
-        "hand_sand",
-        "rib",
-        "tool",
-        "grind",
-      ];
-
-      for (const recordData of recordsData) {
-        if (!validWashTypes.includes(recordData.washType)) {
+      for (const recordData of mappedRecordsData) {
+        if (!validWashTypeCodes.includes(recordData.washType)) {
           throw new Error(`Invalid wash type: ${recordData.washType}`);
         }
 
         if (recordData.processTypes && Array.isArray(recordData.processTypes)) {
           const invalidTypes = recordData.processTypes.filter(
-            (type) => !validProcessTypes.includes(type)
+            (type) => !validProcessTypeCodes.includes(type)
           );
           if (invalidTypes.length > 0) {
             throw new Error(
@@ -346,7 +320,7 @@ class OrderRecord {
       const records = await db
         .insert(orderRecords)
         .values(
-          recordsData.map((data) => ({
+          mappedRecordsData.map((data) => ({
             ...data,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -361,37 +335,111 @@ class OrderRecord {
     }
   }
 
-  // Get valid wash types
-  static getValidWashTypes() {
-    return [
-      { value: "normal", label: "Normal Wash (N/W)" },
-      { value: "heavy", label: "Heavy Wash (Hy/W)" },
-      { value: "silicon", label: "Silicon Wash (Sil/W)" },
-      { value: "heavy_silicon", label: "Heavy Silicon Wash (Hy/Sil/W)" },
-      { value: "enzyme", label: "Enzyme Wash (En/W)" },
-      { value: "heavy_enzyme", label: "Heavy Enzyme Wash (Hy/En/W)" },
-      { value: "dark", label: "Dark Wash (Dk/W)" },
-      { value: "mid", label: "Mid Wash (Mid/W)" },
-      { value: "light", label: "Light Wash (Lit/W)" },
-      { value: "sky", label: "Sky Wash (Sky/W)" },
-      { value: "acid", label: "Acid Wash (Acid/W)" },
-      { value: "tint", label: "Tint Wash (Tint/W)" },
-      { value: "chemical", label: "Chemical Wash (Chem/W)" },
-    ];
+  // Get valid wash types from database
+  static async getValidWashTypes() {
+    try {
+      const washTypes = await this.getWashTypes();
+      return washTypes.map((wt) => ({
+        id: wt.id,
+        value: wt.code,
+        label: wt.name,
+        code: wt.code,
+      }));
+    } catch (error) {
+      console.error("Error getting valid wash types:", error);
+      throw error;
+    }
   }
 
-  // Get valid process types
-  static getValidProcessTypes() {
-    return [
-      { value: "reese", label: "Reese" },
-      { value: "sand_blast", label: "Sand Blast (S/B)" },
-      { value: "viscose", label: "Viscose (V)" },
-      { value: "chevron", label: "Chevron (Chev)" },
-      { value: "hand_sand", label: "Hand Sand (H/S)" },
-      { value: "rib", label: "Rib" },
-      { value: "tool", label: "Tool" },
-      { value: "grind", label: "Grind (Grnd)" },
-    ];
+  // Get valid process types from database
+  static async getValidProcessTypes() {
+    try {
+      const processTypesList = await this.getProcessTypes();
+      return processTypesList.map((pt) => ({
+        id: pt.id,
+        value: pt.code,
+        label: pt.name,
+        code: pt.code,
+      }));
+    } catch (error) {
+      console.error("Error getting valid process types:", error);
+      throw error;
+    }
+  }
+
+  // Fetch all wash types from database
+  static async getWashTypes() {
+    try {
+      const washTypes = await db
+        .select({
+          id: washingTypes.id,
+          name: washingTypes.name,
+          code: washingTypes.code,
+        })
+        .from(washingTypes)
+        .orderBy(asc(washingTypes.id));
+
+      return washTypes;
+    } catch (error) {
+      console.error("Error fetching wash types:", error);
+      throw error;
+    }
+  }
+
+  // Fetch all process types from database
+  static async getProcessTypes() {
+    try {
+      const processTypesList = await db
+        .select({
+          id: processTypes.id,
+          name: processTypes.name,
+          code: processTypes.code,
+        })
+        .from(processTypes)
+        .orderBy(asc(processTypes.id));
+
+      return processTypesList;
+    } catch (error) {
+      console.error("Error fetching process types:", error);
+      throw error;
+    }
+  }
+
+  // Map wash type ID to code value from database
+  static async mapWashTypeId(washTypeId) {
+    try {
+      const washTypes = await this.getWashTypes();
+      const washType = washTypes.find((wt) => wt.id === parseInt(washTypeId));
+      return washType ? washType.code : washTypeId;
+    } catch (error) {
+      console.error("Error mapping wash type ID:", error);
+      return washTypeId;
+    }
+  }
+
+  // Map process type ID to code value from database
+  static async mapProcessTypeId(processTypeId) {
+    try {
+      const processTypesList = await this.getProcessTypes();
+      const processType = processTypesList.find(
+        (pt) => pt.id === parseInt(processTypeId)
+      );
+      return processType ? processType.code : processTypeId;
+    } catch (error) {
+      console.error("Error mapping process type ID:", error);
+      return processTypeId;
+    }
+  }
+
+  // Map array of process type IDs to code values from database
+  static async mapProcessTypeIds(processTypeIds) {
+    if (!Array.isArray(processTypeIds)) {
+      return processTypeIds;
+    }
+    const mappedIds = await Promise.all(
+      processTypeIds.map((id) => this.mapProcessTypeId(id))
+    );
+    return mappedIds;
   }
 
   // Validate total quantity against order quantity
@@ -423,6 +471,106 @@ class OrderRecord {
       };
     } catch (error) {
       console.error("Error validating total quantity:", error);
+      throw error;
+    }
+  }
+
+  // Check if all machine assignments for a record are completed
+  static async isRecordComplete(recordId) {
+    try {
+      // Get the record quantity
+      const [record] = await db
+        .select({ quantity: orderRecords.quantity })
+        .from(orderRecords)
+        .where(eq(orderRecords.id, recordId));
+
+      if (!record) return false;
+
+      // Get total assignments for this record
+      const [totalResult] = await db
+        .select({ count: count() })
+        .from(machineAssignments)
+        .where(eq(machineAssignments.recordId, recordId));
+
+      // Get completed assignments for this record
+      const [completedResult] = await db
+        .select({ count: count() })
+        .from(machineAssignments)
+        .where(
+          and(
+            eq(machineAssignments.recordId, recordId),
+            eq(machineAssignments.status, "Completed")
+          )
+        );
+
+      // Get sum of completed assignment quantities
+      const [completedQuantityResult] = await db
+        .select({ totalQuantity: sum(machineAssignments.quantity) })
+        .from(machineAssignments)
+        .where(
+          and(
+            eq(machineAssignments.recordId, recordId),
+            eq(machineAssignments.status, "Completed")
+          )
+        );
+
+      const totalAssignments = parseInt(totalResult.count) || 0;
+      const completedAssignments = parseInt(completedResult.count) || 0;
+      const completedQuantity =
+        parseInt(completedQuantityResult.totalQuantity) || 0;
+      const recordQuantity = record.quantity;
+
+      // Record is complete if:
+      // 1. There are assignments
+      // 2. All assignments are completed
+      // 3. Sum of completed quantities equals record quantity
+      return (
+        totalAssignments > 0 &&
+        totalAssignments === completedAssignments &&
+        completedQuantity === recordQuantity
+      );
+    } catch (error) {
+      console.error("Error checking record completion:", error);
+      return false;
+    }
+  }
+
+  // Update record status based on assignment completion
+  static async updateRecordStatus(recordId, forceStatus = null) {
+    try {
+      let newStatus;
+
+      if (forceStatus) {
+        // Force a specific status (e.g., "Pending" when assignment changes from Complete to In Progress)
+        newStatus = forceStatus;
+      } else {
+        // Check if record should be complete based on assignments
+        const isComplete = await this.isRecordComplete(recordId);
+        newStatus = isComplete ? "Complete" : "Pending";
+      }
+
+      const [updatedRecord] = await db
+        .update(orderRecords)
+        .set({
+          status: newStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(orderRecords.id, recordId))
+        .returning();
+
+      // Update the order status based on record status change
+      const Order = require("./Order");
+      if (forceStatus) {
+        // If record is forced to Pending, force order to Pending
+        await Order.updateOrderStatus(updatedRecord.orderId, "Pending");
+      } else {
+        // Check if order should be complete based on all records
+        await Order.updateOrderStatus(updatedRecord.orderId);
+      }
+
+      return updatedRecord;
+    } catch (error) {
+      console.error("Error updating record status:", error);
       throw error;
     }
   }

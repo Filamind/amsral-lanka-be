@@ -148,46 +148,6 @@ const items = pgTable(
   })
 );
 
-// Customer Orders table schema (keeping original)
-const customerOrders = pgTable("customer_orders", {
-  id: serial("id").primaryKey(),
-  orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
-  customerId: integer("customer_id")
-    .references(() => customers.id)
-    .notNull(),
-  orderDate: date("order_date").notNull(),
-  deliveryDate: date("delivery_date"),
-  status: varchar("status", { length: 50 }).default("pending"), // pending, processing, completed, cancelled
-  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).default(
-    "0.00"
-  ),
-  notes: text("notes"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
-
-// Customer Order Lines table schema (keeping original)
-const customerOrderLines = pgTable("customer_order_lines", {
-  id: serial("id").primaryKey(),
-  customerOrderId: integer("customer_order_id")
-    .references(() => customerOrders.id)
-    .notNull(),
-  itemTypeId: integer("item_type_id")
-    .references(() => itemTypes.id)
-    .notNull(),
-  quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).default("0.00"),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).default(
-    "0.00"
-  ),
-  description: text("description"),
-  notes: text("notes"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
-
 // Orders table schema (new table)
 const orders = pgTable(
   "orders",
@@ -196,7 +156,6 @@ const orders = pgTable(
     date: date("date").notNull(),
     referenceNo: varchar("reference_no", { length: 50 }).unique().notNull(),
     customerId: varchar("customer_id", { length: 50 }).notNull(),
-    itemId: varchar("item_id", { length: 50 }).notNull(),
     quantity: integer("quantity").notNull(),
     notes: text("notes"),
     deliveryDate: date("delivery_date").notNull(),
@@ -207,7 +166,6 @@ const orders = pgTable(
   (table) => ({
     referenceNoIdx: index("idx_reference_no").on(table.referenceNo),
     customerIdIdx: index("idx_customer_id").on(table.customerId),
-    itemIdIdx: index("idx_item_id").on(table.itemId),
     statusIdx: index("idx_status").on(table.status),
     dateIdx: index("idx_date").on(table.date),
     deliveryDateIdx: index("idx_delivery_date").on(table.deliveryDate),
@@ -222,36 +180,53 @@ const orderRecords = pgTable(
     orderId: integer("order_id")
       .references(() => orders.id, { onDelete: "cascade" })
       .notNull(),
+    itemId: varchar("item_id", { length: 50 }),
     quantity: integer("quantity").notNull(),
     washType: varchar("wash_type", { length: 50 }).notNull(),
     processTypes: json("process_types").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("Pending"), // "Pending", "Complete"
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
     orderIdIdx: index("idx_order_id").on(table.orderId),
+    itemIdIdx: index("idx_item_id").on(table.itemId),
     washTypeIdx: index("idx_wash_type").on(table.washType),
+    statusIdx: index("idx_status").on(table.status),
   })
 );
 
-// Customer Order Line Process table schema (keeping as is for now - this is different from order_records)
-const customerOrderLineProcesses = pgTable("customer_order_line_processes", {
-  id: serial("id").primaryKey(),
-  customerOrderLineId: integer("customer_order_line_id")
-    .references(() => customerOrderLines.id)
-    .notNull(),
-  sequenceNumber: integer("sequence_number").notNull(),
-  washingTypeId: integer("washing_type_id").references(() => washingTypes.id),
-  dryingTypeId: integer("drying_type_id").references(() => dryingTypes.id),
-  processType: varchar("process_type", { length: 20 }).notNull(), // 'washing' or 'drying'
-  status: varchar("status", { length: 50 }).default("pending"), // pending, in_progress, completed
-  startedAt: timestamp("started_at", { withTimezone: true }),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  notes: text("notes"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+// Machine Assignments table schema
+const machineAssignments = pgTable(
+  "machine_assignments",
+  {
+    id: serial("id").primaryKey(),
+    recordId: integer("record_id")
+      .references(() => orderRecords.id, { onDelete: "cascade" })
+      .notNull(),
+    orderId: integer("order_id")
+      .references(() => orders.id, { onDelete: "cascade" })
+      .notNull(),
+    assignedById: integer("assigned_by_id").references(() => employees.id, {
+      onDelete: "set null",
+    }),
+    quantity: integer("quantity").notNull(),
+    washingMachine: varchar("washing_machine", { length: 50 }),
+    dryingMachine: varchar("drying_machine", { length: 50 }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow(),
+    status: varchar("status", { length: 20 }).notNull().default("In Progress"), // "In Progress", "Completed", "Cancelled"
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    recordIdIdx: index("idx_assignment_record_id").on(table.recordId),
+    orderIdIdx: index("idx_assignment_order_id").on(table.orderId),
+    assignedByIdIdx: index("idx_assignment_assigned_by_id").on(
+      table.assignedById
+    ),
+    statusIdx: index("idx_assignment_status").on(table.status),
+  })
+);
 
 module.exports = {
   roles,
@@ -264,9 +239,7 @@ module.exports = {
   customers,
   itemTypes,
   items,
-  customerOrders,
-  customerOrderLines,
-  customerOrderLineProcesses,
   orders,
   orderRecords,
+  machineAssignments,
 };

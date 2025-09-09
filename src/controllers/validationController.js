@@ -1,7 +1,6 @@
 const User = require("../models/User");
 const Customer = require("../models/Customer");
 const Employee = require("../models/Employee");
-const CustomerOrder = require("../models/CustomerOrder");
 
 class ValidationController {
   // POST /api/validation/check-unique - Check if field value is unique

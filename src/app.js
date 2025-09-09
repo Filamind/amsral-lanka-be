@@ -13,14 +13,13 @@ const processTypeRoutes = require("./routes/processTypeRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const itemTypeRoutes = require("./routes/itemTypeRoutes");
 const itemRoutes = require("./routes/itemRoutes");
-const customerOrderRoutes = require("./routes/customerOrderRoutes");
-const customerOrderLineRoutes = require("./routes/customerOrderLineRoutes");
-const customerOrderLineProcessRoutes = require("./routes/customerOrderLineProcessRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const validationRoutes = require("./routes/validationRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const productionRoutes = require("./routes/productionRoutes");
 const referenceRoutes = require("./routes/referenceRoutes");
+const recordRoutes = require("./routes/recordRoutes");
+const machineAssignmentRoutes = require("./routes/machineAssignmentRoutes");
 
 // Import database connection
 const { pool } = require("./config/db");
@@ -82,14 +81,14 @@ app.use("/api/process-types", processTypeRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/item-types", itemTypeRoutes);
 app.use("/api/items", itemRoutes);
-app.use("/api/customer-orders", customerOrderRoutes);
-app.use("/api/customer-order-lines", customerOrderLineRoutes);
-app.use("/api/customer-order-line-processes", customerOrderLineProcessRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/validation", validationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/production", productionRoutes);
 app.use("/api/reference", referenceRoutes);
+app.use("/api/records", machineAssignmentRoutes);
+app.use("/api/records", recordRoutes);
+app.use("/api", machineAssignmentRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -122,9 +121,6 @@ app.get("/", (req, res) => {
       customers: "/api/customers",
       itemTypes: "/api/item-types",
       items: "/api/items",
-      customerOrders: "/api/customer-orders",
-      customerOrderLines: "/api/customer-order-lines",
-      customerOrderLineProcesses: "/api/customer-order-line-processes",
       orders: "/api/orders",
       orderById: "/api/orders/:id",
       createOrder: "POST /api/orders",
@@ -132,6 +128,17 @@ app.get("/", (req, res) => {
       deleteOrder: "DELETE /api/orders/:id",
       washTypes: "/api/orders/wash-types",
       processTypes: "/api/orders/process-types",
+      orderRecords: "/api/orders/records",
+      records: "/api/records/:id",
+      recordAssignments: "/api/records/:recordId/assignments",
+      createAssignment: "POST /api/records/:recordId/assignments",
+      updateAssignment: "PUT /api/records/:recordId/assignments/:assignmentId",
+      completeAssignment:
+        "PUT /api/records/:recordId/assignments/:assignmentId/complete",
+      deleteAssignment:
+        "DELETE /api/records/:recordId/assignments/:assignmentId",
+      assignmentStats: "/api/records/:recordId/assignments/stats",
+      machines: "/api/machines",
       validation: "/api/validation",
       dashboard: "/api/dashboard",
       production: "/api/production",

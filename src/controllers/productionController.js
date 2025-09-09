@@ -1,7 +1,3 @@
-const CustomerOrderLine = require("../models/CustomerOrderLine");
-const CustomerOrderLineProcess = require("../models/CustomerOrderLineProcess");
-const CustomerOrder = require("../models/CustomerOrder");
-
 class ProductionController {
   // GET /api/production/records - Get all production records
   static async getProductionRecords(req, res) {

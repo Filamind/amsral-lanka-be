@@ -17,6 +17,9 @@ router.get("/wash-types", OrderController.getWashTypes);
 // GET /api/orders/process-types - Get valid process types
 router.get("/process-types", OrderController.getProcessTypes);
 
+// GET /api/orders/records - Get all order records with pagination and filtering
+router.get("/records", OrderController.getAllOrderRecords);
+
 // GET /api/orders/:id - Get single order by ID
 router.get("/:id", OrderController.getOrderById);
 

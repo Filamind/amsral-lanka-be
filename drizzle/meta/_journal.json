@@ -78,6 +78,13 @@
       "when": 1757087790573,
       "tag": "0010_light_proteus",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1757428070637,
+      "tag": "0011_numerous_siren",
+      "breakpoints": true
     }
   ]
 }

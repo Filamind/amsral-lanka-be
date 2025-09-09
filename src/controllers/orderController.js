@@ -71,13 +71,11 @@ class OrderController {
       }
     } catch (error) {
       console.error("Error updating order record:", error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
   }
 
@@ -106,13 +104,11 @@ class OrderController {
       res.json({ success: true, message: "Record deleted successfully" });
     } catch (error) {
       console.error("Error deleting order record:", error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
   }
   // POST /api/orders/:orderId/records - Add order record
@@ -216,13 +212,12 @@ class OrderController {
         referenceNo: order.referenceNo,
         customerId: order.customerId,
         customerName: order.customerName,
-        itemId: order.itemId || null,
-        itemName: order.itemName || null,
         quantity: order.quantity,
         notes: order.notes,
         deliveryDate: order.deliveryDate,
         status: order.status,
         recordsCount: order.recordsCount || 0,
+        complete: order.complete || false,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
         records: [],
@@ -266,7 +261,7 @@ class OrderController {
       const formattedRecords = records.map((rec) => ({
         id: rec.id,
         orderId: rec.orderId,
-        itemId: rec.itemId || null,
+        itemId: rec.itemId,
         quantity: rec.quantity,
         washType: rec.washType,
         processTypes: rec.processTypes,
@@ -281,13 +276,12 @@ class OrderController {
           referenceNo: order.referenceNo,
           customerId: order.customerId,
           customerName: order.customerName,
-          itemId: order.itemId || null,
-          itemName: order.itemName || null,
           quantity: order.quantity,
           notes: order.notes,
           deliveryDate: order.deliveryDate,
           status: order.status,
           recordsCount: formattedRecords.length,
+          complete: order.complete || false,
           createdAt: order.createdAt,
           updatedAt: order.updatedAt,
           records: formattedRecords,
@@ -316,17 +310,14 @@ class OrderController {
         records = [],
       } = req.body;
 
-      // Validation
+      // Validatione ta
       const errors = {};
 
       if (!date) errors.date = "Date is required";
       if (!customerId) errors.customerId = "Customer is required";
-      if (!itemId) errors.itemId = "Item is required";
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!deliveryDate) errors.deliveryDate = "Delivery date is required";
-      if (!records || records.length === 0)
-        errors.records = "At least one record is required";
 
       // Validate records
       if (records && records.length > 0) {
@@ -373,7 +364,6 @@ class OrderController {
         const orderData = {
           date: new Date(date),
           customerId,
-          itemId,
           quantity: parseInt(quantity),
           notes,
           deliveryDate: new Date(deliveryDate),
@@ -382,15 +372,18 @@ class OrderController {
 
         const order = await Order.create(orderData);
 
-        // Create records
-        const recordsData = records.map((record) => ({
-          orderId: order.id,
-          quantity: parseInt(record.quantity),
-          washType: record.washType,
-          processTypes: record.processTypes,
-        }));
+        // Create records (only if records array is not empty)
+        let createdRecords = [];
+        if (records && records.length > 0) {
+          const recordsData = records.map((record) => ({
+            orderId: order.id,
+            quantity: parseInt(record.quantity),
+            washType: record.washType,
+            processTypes: record.processTypes,
+          }));
 
-        const createdRecords = await OrderRecord.bulkCreate(recordsData);
+          createdRecords = await OrderRecord.bulkCreate(recordsData);
+        }
 
         return { order, records: createdRecords };
       });
@@ -625,7 +618,7 @@ class OrderController {
   // GET /api/orders/wash-types - Get valid wash types
   static async getWashTypes(req, res) {
     try {
-      const washTypes = OrderRecord.getValidWashTypes();
+      const washTypes = await OrderRecord.getValidWashTypes();
       res.json({
         success: true,
         data: washTypes,
@@ -643,13 +636,112 @@ class OrderController {
   // GET /api/orders/process-types - Get valid process types
   static async getProcessTypes(req, res) {
     try {
-      const processTypes = OrderRecord.getValidProcessTypes();
+      const processTypes = await OrderRecord.getValidProcessTypes();
       res.json({
         success: true,
         data: processTypes,
       });
     } catch (error) {
       console.error("Error getting process types:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // GET /api/orders/records - Get all order records with pagination and filtering
+  static async getAllOrderRecords(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 50,
+        orderId = null,
+        washType = null,
+        search = null,
+        sortBy = "id",
+        sortOrder = "asc",
+      } = req.query;
+
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+
+      // Validate pagination parameters
+      if (parseInt(limit) > 100) {
+        return res.status(400).json({
+          success: false,
+          message: "Limit cannot exceed 100",
+        });
+      }
+
+      if (parseInt(page) < 1 || parseInt(limit) < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Page and limit must be positive numbers",
+        });
+      }
+
+      const options = {
+        limit: parseInt(limit),
+        offset,
+        orderId: orderId ? parseInt(orderId) : null,
+        washType,
+        search,
+        sortBy,
+        sortOrder,
+      };
+
+      // Get order records and total count
+      const records = await OrderRecord.findAll(options);
+      const totalRecords = await OrderRecord.count(options);
+      const totalPages = Math.ceil(totalRecords / parseInt(limit));
+
+      // Format records for response with enhanced data
+      const formattedRecords = await Promise.all(
+        records.map(async (record) => {
+          // Get order details
+          const order = await Order.findById(record.orderId);
+
+          // Get assignment statistics
+          const MachineAssignment = require("../models/MachineAssignment");
+          const stats = await MachineAssignment.getRecordStats(record.id);
+
+          // Check if all assignments are completed
+          const isComplete = await OrderRecord.isRecordComplete(record.id);
+
+          return {
+            id: record.id,
+            orderId: record.orderId,
+            itemId: record.itemId,
+            quantity: record.quantity,
+            washType: record.washType,
+            processTypes: record.processTypes,
+            status: record.status, // Database status (Pending/Complete)
+            complete: isComplete, // Boolean: true if all assignments are completed
+            orderRef: order?.referenceNo || null,
+            customerName: order?.customerName || null,
+            itemName: record.itemId, // You might want to get actual item name from items table
+            remainingQuantity: stats.remainingQuantity,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        data: {
+          records: formattedRecords,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages,
+            totalRecords,
+            limit: parseInt(limit),
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error getting order records:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

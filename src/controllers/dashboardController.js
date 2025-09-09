@@ -1,4 +1,3 @@
-const CustomerOrder = require("../models/CustomerOrder");
 const Customer = require("../models/Customer");
 const Employee = require("../models/Employee");
 

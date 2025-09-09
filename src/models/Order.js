@@ -56,7 +56,6 @@ class Order {
           date: orders.date,
           referenceNo: orders.referenceNo,
           customerId: orders.customerId,
-          itemId: orders.itemId,
           quantity: orders.quantity,
           notes: orders.notes,
           deliveryDate: orders.deliveryDate,
@@ -75,8 +74,8 @@ class Order {
       return {
         ...order,
         customerName: await this.getCustomerName(order.customerId),
-        itemName: await this.getItemName(order.itemId),
         recordsCount: await this.getRecordsCount(id),
+        complete: await this.isOrderComplete(id),
       };
     } catch (error) {
       console.error("Error finding order by ID:", error);
@@ -120,8 +119,7 @@ class Order {
         conditions.push(
           or(
             ilike(orders.referenceNo, `%${search}%`),
-            ilike(orders.customerId, `%${search}%`),
-            ilike(orders.itemId, `%${search}%`)
+            ilike(orders.customerId, `%${search}%`)
           )
         );
       }
@@ -147,7 +145,6 @@ class Order {
           date: orders.date,
           referenceNo: orders.referenceNo,
           customerId: orders.customerId,
-          itemId: orders.itemId,
           quantity: orders.quantity,
           notes: orders.notes,
           deliveryDate: orders.deliveryDate,
@@ -161,13 +158,13 @@ class Order {
         .limit(limit)
         .offset(offset);
 
-      // Enhance with customer names, item names, and records count
+      // Enhance with customer names, records count, and completion status
       const enhancedOrders = await Promise.all(
         orderList.map(async (order) => ({
           ...order,
           customerName: await this.getCustomerName(order.customerId),
-          itemName: await this.getItemName(order.itemId),
           recordsCount: await this.getRecordsCount(order.id),
+          complete: await this.isOrderComplete(order.id),
           records: await this.getOrderRecords(order.id),
         }))
       );
@@ -190,8 +187,7 @@ class Order {
         conditions.push(
           or(
             ilike(orders.referenceNo, `%${search}%`),
-            ilike(orders.customerId, `%${search}%`),
-            ilike(orders.itemId, `%${search}%`)
+            ilike(orders.customerId, `%${search}%`)
           )
         );
       }
@@ -310,16 +306,6 @@ class Order {
     }
   }
 
-  static async getItemName(itemId) {
-    try {
-      // Implement item lookup by itemId
-      // For now, return placeholder
-      return `Item ${itemId}`;
-    } catch (error) {
-      return `Item ${itemId}`;
-    }
-  }
-
   static async getRecordsCount(orderId) {
     try {
       const [result] = await db
@@ -344,6 +330,96 @@ class Order {
       return records;
     } catch (error) {
       return [];
+    }
+  }
+
+  // Check if order is complete (total quantity equals sum of records)
+  static async isOrderComplete(orderId) {
+    try {
+      // Get order quantity
+      const [order] = await db
+        .select({ quantity: orders.quantity })
+        .from(orders)
+        .where(eq(orders.id, orderId));
+
+      if (!order) {
+        return false;
+      }
+
+      // Get sum of all record quantities for this order
+      const [result] = await db
+        .select({ totalRecordQuantity: sum(orderRecords.quantity) })
+        .from(orderRecords)
+        .where(eq(orderRecords.orderId, orderId));
+
+      const totalRecordQuantity = parseInt(result.totalRecordQuantity) || 0;
+
+      // Order is complete if order quantity equals total record quantity
+      return order.quantity === totalRecordQuantity;
+    } catch (error) {
+      console.error("Error checking order completion:", error);
+      return false;
+    }
+  }
+
+  // Check if all order records for an order are completed
+  static async isOrderRecordsComplete(orderId) {
+    try {
+      // Get total order records for this order
+      const [totalResult] = await db
+        .select({ count: count() })
+        .from(orderRecords)
+        .where(eq(orderRecords.orderId, orderId));
+
+      // Get completed order records for this order
+      const [completedResult] = await db
+        .select({ count: count() })
+        .from(orderRecords)
+        .where(
+          and(
+            eq(orderRecords.orderId, orderId),
+            eq(orderRecords.status, "Complete")
+          )
+        );
+
+      const totalRecords = parseInt(totalResult.count) || 0;
+      const completedRecords = parseInt(completedResult.count) || 0;
+
+      // Order records are complete if there are records and all are completed
+      return totalRecords > 0 && totalRecords === completedRecords;
+    } catch (error) {
+      console.error("Error checking order records completion:", error);
+      return false;
+    }
+  }
+
+  // Update order status based on order records completion
+  static async updateOrderStatus(orderId, forceStatus = null) {
+    try {
+      let newStatus;
+
+      if (forceStatus) {
+        // Force a specific status (e.g., "Pending" when a record changes to Pending)
+        newStatus = forceStatus;
+      } else {
+        // Check if order should be complete based on order records
+        const isComplete = await this.isOrderRecordsComplete(orderId);
+        newStatus = isComplete ? "Complete" : "Pending";
+      }
+
+      const [updatedOrder] = await db
+        .update(orders)
+        .set({
+          status: newStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, orderId))
+        .returning();
+
+      return updatedOrder;
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      throw error;
     }
   }
 }
