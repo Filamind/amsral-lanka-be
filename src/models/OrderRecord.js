@@ -9,6 +9,7 @@ const {
   inArray,
   ne,
   sum,
+  isNull,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
 const {
@@ -20,12 +21,61 @@ const {
 } = require("../db/schema");
 
 class OrderRecord {
+  // Generate tracking number for a new order record
+  static async generateTrackingNumber(orderId) {
+    try {
+      // Get the latest tracking number for this order
+      const latestRecord = await db
+        .select({ trackingNumber: orderRecords.trackingNumber })
+        .from(orderRecords)
+        .where(eq(orderRecords.orderId, orderId))
+        .orderBy(desc(orderRecords.id))
+        .limit(1);
+
+      if (!latestRecord || latestRecord.length === 0) {
+        // First record for this order - use 'A'
+        return `${orderId}A`;
+      }
+
+      // If the latest record has no tracking number, count existing records to determine the next letter
+      if (!latestRecord[0].trackingNumber) {
+        const recordCount = await db
+          .select({ count: count() })
+          .from(orderRecords)
+          .where(eq(orderRecords.orderId, orderId));
+
+        const nextLetter = String.fromCharCode(
+          65 + (recordCount[0].count || 0)
+        ); // 65 is 'A'
+        return `${orderId}${nextLetter}`;
+      }
+
+      // Get the last letter from the tracking number
+      const lastTrackingNumber = latestRecord[0].trackingNumber;
+      const lastLetter = lastTrackingNumber.slice(-1);
+
+      // Generate next letter (A -> B -> C, etc.)
+      const nextLetter = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+
+      return `${orderId}${nextLetter}`;
+    } catch (error) {
+      console.error("Error generating tracking number:", error);
+      throw error;
+    }
+  }
+
   // Create a new order record
   static async create(recordData) {
     try {
+      // Generate tracking number
+      const trackingNumber = await this.generateTrackingNumber(
+        recordData.orderId
+      );
+
       // Map numeric IDs to string values if needed
       const mappedData = {
         ...recordData,
+        trackingNumber,
         washType: await this.mapWashTypeId(recordData.washType),
         processTypes: await this.mapProcessTypeIds(recordData.processTypes),
       };
@@ -284,9 +334,22 @@ class OrderRecord {
   // Bulk create records
   static async bulkCreate(recordsData) {
     try {
+      // Generate tracking numbers for all records
+      const recordsWithTrackingNumbers = [];
+      for (let i = 0; i < recordsData.length; i++) {
+        const recordData = recordsData[i];
+        const trackingNumber = await this.generateTrackingNumber(
+          recordData.orderId
+        );
+        recordsWithTrackingNumbers.push({
+          ...recordData,
+          trackingNumber,
+        });
+      }
+
       // Map numeric IDs to string values for all records
       const mappedRecordsData = await Promise.all(
-        recordsData.map(async (recordData) => ({
+        recordsWithTrackingNumbers.map(async (recordData) => ({
           ...recordData,
           washType: await this.mapWashTypeId(recordData.washType),
           processTypes: await this.mapProcessTypeIds(recordData.processTypes),
@@ -532,6 +595,83 @@ class OrderRecord {
     } catch (error) {
       console.error("Error checking record completion:", error);
       return false;
+    }
+  }
+
+  // Update tracking numbers for existing records that have NULL tracking numbers
+  static async updateNullTrackingNumbers() {
+    try {
+      // Get all records with NULL tracking numbers, grouped by orderId
+      const recordsWithNullTracking = await db
+        .select()
+        .from(orderRecords)
+        .where(isNull(orderRecords.trackingNumber))
+        .orderBy(asc(orderRecords.orderId), asc(orderRecords.id));
+
+      if (recordsWithNullTracking.length === 0) {
+        return {
+          updated: 0,
+          message: "No records with NULL tracking numbers found",
+        };
+      }
+
+      // Group by orderId and update tracking numbers
+      const orderGroups = {};
+      recordsWithNullTracking.forEach((record) => {
+        if (!orderGroups[record.orderId]) {
+          orderGroups[record.orderId] = [];
+        }
+        orderGroups[record.orderId].push(record);
+      });
+
+      let totalUpdated = 0;
+      for (const [orderId, records] of Object.entries(orderGroups)) {
+        // Get existing tracking numbers for this order to determine starting letter
+        const existingRecords = await db
+          .select({ trackingNumber: orderRecords.trackingNumber })
+          .from(orderRecords)
+          .where(
+            and(
+              eq(orderRecords.orderId, parseInt(orderId)),
+              ne(orderRecords.trackingNumber, null)
+            )
+          )
+          .orderBy(desc(orderRecords.id));
+
+        let nextLetterIndex = 0;
+        if (existingRecords.length > 0) {
+          // Find the highest letter used
+          const lastTrackingNumber = existingRecords[0].trackingNumber;
+          const lastLetter = lastTrackingNumber.slice(-1);
+          nextLetterIndex = lastLetter.charCodeAt(0) - 64; // A=1, B=2, etc.
+        }
+
+        // Update each record with NULL tracking number
+        for (const record of records) {
+          const trackingNumber = `${orderId}${String.fromCharCode(
+            65 + nextLetterIndex
+          )}`;
+
+          await db
+            .update(orderRecords)
+            .set({
+              trackingNumber,
+              updatedAt: new Date(),
+            })
+            .where(eq(orderRecords.id, record.id));
+
+          nextLetterIndex++;
+          totalUpdated++;
+        }
+      }
+
+      return {
+        updated: totalUpdated,
+        message: `Updated ${totalUpdated} records with tracking numbers`,
+      };
+    } catch (error) {
+      console.error("Error updating NULL tracking numbers:", error);
+      throw error;
     }
   }
 

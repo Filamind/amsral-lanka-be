@@ -71,9 +71,7 @@ class MachineAssignmentController {
       if (!assignedById) errors.assignedById = "Assigned to ID is required";
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
-      if (!washingMachine)
-        errors.washingMachine = "Washing machine is required";
-      if (!dryingMachine) errors.dryingMachine = "Drying machine is required";
+      // Washing machine and drying machine are now optional
 
       if (Object.keys(errors).length > 0) {
         return res.status(400).json({

@@ -62,6 +62,7 @@ class OrderController {
             quantity: updated.quantity,
             washType: updated.washType,
             processTypes: updated.processTypes,
+            trackingNumber: updated.trackingNumber,
             createdAt: updated.createdAt,
             updatedAt: updated.updatedAt,
           },
@@ -163,6 +164,7 @@ class OrderController {
             quantity: record.quantity,
             washType: record.washType,
             processTypes: record.processTypes,
+            trackingNumber: record.trackingNumber,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
           },
@@ -188,6 +190,8 @@ class OrderController {
         search = null,
         status = null,
         customerId = null,
+        customerName = null,
+        orderId = null,
       } = req.query;
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -198,6 +202,8 @@ class OrderController {
         search,
         status,
         customerId,
+        customerName,
+        orderId: orderId ? parseInt(orderId) : null,
       };
 
       // Get orders and total count
@@ -265,6 +271,7 @@ class OrderController {
         quantity: rec.quantity,
         washType: rec.washType,
         processTypes: rec.processTypes,
+        trackingNumber: rec.trackingNumber,
         createdAt: rec.createdAt,
         updatedAt: rec.updatedAt,
       }));
@@ -289,6 +296,195 @@ class OrderController {
       });
     } catch (error) {
       console.error("Error getting order by ID:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // GET /api/orders/:id/details - Get comprehensive order details with records, assignments, and completion percentage
+  static async getOrderDetails(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Get order details
+      const order = await Order.findById(id);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+
+      // Get records for this order
+      const records = await OrderRecord.findByOrderId(id);
+
+      // Get assignments and completion stats for each record
+      const MachineAssignment = require("../models/MachineAssignment");
+      const recordsWithAssignments = await Promise.all(
+        records.map(async (record) => {
+          // Get assignments for this record
+          const assignments = await MachineAssignment.findByRecordId(record.id);
+
+          // Get completion statistics for this record
+          const stats = await MachineAssignment.getRecordStats(record.id);
+
+          // Check if record is complete
+          const isComplete = await OrderRecord.isRecordComplete(record.id);
+
+          return {
+            id: record.id,
+            orderId: record.orderId,
+            itemId: record.itemId,
+            quantity: record.quantity,
+            washType: record.washType,
+            processTypes: record.processTypes,
+            trackingNumber: record.trackingNumber,
+            status: record.status,
+            complete: isComplete,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            assignments: assignments.map((assignment) => ({
+              id: assignment.id,
+              recordId: assignment.recordId,
+              orderId: assignment.orderId,
+              assignedById: assignment.assignedById,
+              assignedTo: assignment.assignedTo,
+              quantity: assignment.quantity,
+              washingMachine: assignment.washingMachine,
+              dryingMachine: assignment.dryingMachine,
+              trackingNumber: assignment.trackingNumber,
+              status: assignment.status,
+              assignedAt: assignment.assignedAt,
+              createdAt: assignment.createdAt,
+              updatedAt: assignment.updatedAt,
+            })),
+            stats: {
+              totalQuantity: stats.totalQuantity,
+              assignedQuantity: stats.assignedQuantity,
+              remainingQuantity: stats.remainingQuantity,
+              totalAssignments: stats.totalAssignments,
+              completedAssignments: stats.completedAssignments,
+              inProgressAssignments: stats.inProgressAssignments,
+              completionPercentage: stats.completionPercentage,
+            },
+          };
+        })
+      );
+
+      // Calculate overall completion percentage
+      const totalOrderQuantity = order.quantity;
+      const totalAssignedQuantity = recordsWithAssignments.reduce(
+        (sum, record) => sum + parseInt(record.stats.assignedQuantity || 0),
+        0
+      );
+      const totalCompletedQuantity = recordsWithAssignments.reduce(
+        (sum, record) => {
+          const completedAssignments = record.assignments.filter(
+            (assignment) => assignment.status === "Completed"
+          );
+          return (
+            sum +
+            completedAssignments.reduce(
+              (assignmentSum, assignment) =>
+                assignmentSum + parseInt(assignment.quantity || 0),
+              0
+            )
+          );
+        },
+        0
+      );
+
+      // Calculate overall completion percentage based on completed work
+      const overallCompletionPercentage =
+        totalOrderQuantity > 0
+          ? Math.round((totalCompletedQuantity / totalOrderQuantity) * 100)
+          : 0;
+
+      // Calculate overall assignment statistics
+      const totalAssignments = recordsWithAssignments.reduce(
+        (sum, record) => sum + record.stats.totalAssignments,
+        0
+      );
+      const completedAssignments = recordsWithAssignments.reduce(
+        (sum, record) => sum + record.stats.completedAssignments,
+        0
+      );
+      const inProgressAssignments = recordsWithAssignments.reduce(
+        (sum, record) => sum + record.stats.inProgressAssignments,
+        0
+      );
+
+      res.json({
+        success: true,
+        data: {
+          order: {
+            id: order.id,
+            date: order.date,
+            referenceNo: order.referenceNo,
+            customerId: order.customerId,
+            customerName: order.customerName,
+            quantity: order.quantity,
+            notes: order.notes,
+            deliveryDate: order.deliveryDate,
+            status: order.status,
+            complete: order.complete || false,
+            createdAt: order.createdAt,
+            updatedAt: order.updatedAt,
+          },
+          records: recordsWithAssignments,
+          overallStats: {
+            totalQuantity: totalOrderQuantity,
+            totalAssignedQuantity,
+            totalCompletedQuantity,
+            remainingQuantity: Math.max(
+              0,
+              totalOrderQuantity - totalAssignedQuantity
+            ),
+            totalAssignments,
+            completedAssignments,
+            inProgressAssignments,
+            overallCompletionPercentage,
+            recordsCount: recordsWithAssignments.length,
+            completeRecordsCount: recordsWithAssignments.filter(
+              (record) => record.complete
+            ).length,
+            // Assignment completeness details
+            assignmentCompleteness: {
+              totalAssignments,
+              completedAssignments,
+              inProgressAssignments,
+              cancelledAssignments: recordsWithAssignments.reduce(
+                (sum, record) =>
+                  sum +
+                  record.assignments.filter(
+                    (assignment) => assignment.status === "Cancelled"
+                  ).length,
+                0
+              ),
+              assignmentCompletionPercentage:
+                totalAssignments > 0
+                  ? Math.round((completedAssignments / totalAssignments) * 100)
+                  : 0,
+            },
+            // Work completion details
+            workCompletion: {
+              totalQuantity: totalOrderQuantity,
+              assignedQuantity: totalAssignedQuantity,
+              completedQuantity: totalCompletedQuantity,
+              remainingQuantity: Math.max(
+                0,
+                totalOrderQuantity - totalAssignedQuantity
+              ),
+              workCompletionPercentage: overallCompletionPercentage,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error getting order details:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -661,7 +857,7 @@ class OrderController {
         washType = null,
         search = null,
         sortBy = "id",
-        sortOrder = "asc",
+        sortOrder = "desc",
       } = req.query;
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -716,6 +912,7 @@ class OrderController {
             quantity: record.quantity,
             washType: record.washType,
             processTypes: record.processTypes,
+            trackingNumber: record.trackingNumber,
             status: record.status, // Database status (Pending/Complete)
             complete: isComplete, // Boolean: true if all assignments are completed
             orderRef: order?.referenceNo || null,

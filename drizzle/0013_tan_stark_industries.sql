@@ -1,0 +1,2 @@
+ALTER TABLE "machine_assignments" ADD COLUMN "tracking_number" varchar(20);--> statement-breakpoint
+CREATE INDEX "idx_assignment_tracking_number" ON "machine_assignments" USING btree ("tracking_number");
