@@ -1,4 +1,15 @@
-const { eq, and, or, ilike, count, asc, desc, sum } = require("drizzle-orm");
+const {
+  eq,
+  and,
+  or,
+  ilike,
+  count,
+  asc,
+  desc,
+  sum,
+  isNull,
+  ne,
+} = require("drizzle-orm");
 const { db } = require("../config/db");
 const {
   machineAssignments,
@@ -10,6 +21,58 @@ const {
 } = require("../db/schema");
 
 class MachineAssignment {
+  // Generate tracking number for a new machine assignment
+  static async generateTrackingNumber(recordId) {
+    try {
+      // Get the order record's tracking number
+      const [record] = await db
+        .select({ trackingNumber: orderRecords.trackingNumber })
+        .from(orderRecords)
+        .where(eq(orderRecords.id, recordId))
+        .limit(1);
+
+      if (!record || !record.trackingNumber) {
+        throw new Error(
+          `Order record with ID ${recordId} not found or has no tracking number`
+        );
+      }
+
+      const orderRecordTrackingNumber = record.trackingNumber;
+
+      // Get the latest assignment tracking number for this record
+      const latestAssignment = await db
+        .select({ trackingNumber: machineAssignments.trackingNumber })
+        .from(machineAssignments)
+        .where(eq(machineAssignments.recordId, recordId))
+        .orderBy(desc(machineAssignments.id))
+        .limit(1);
+
+      if (
+        !latestAssignment ||
+        latestAssignment.length === 0 ||
+        !latestAssignment[0].trackingNumber
+      ) {
+        // First assignment for this record - use '1'
+        return `${orderRecordTrackingNumber}1`;
+      }
+
+      // Get the last number from the tracking number
+      const lastTrackingNumber = latestAssignment[0].trackingNumber;
+      const lastNumber = parseInt(lastTrackingNumber.slice(-1));
+
+      // Generate next number (1 -> 2 -> 3, etc.)
+      const nextNumber = lastNumber + 1;
+
+      return `${orderRecordTrackingNumber}${nextNumber}`;
+    } catch (error) {
+      console.error(
+        "Error generating machine assignment tracking number:",
+        error
+      );
+      throw error;
+    }
+  }
+
   // Find all machine assignments with filtering
   static async findAll(options = {}) {
     try {
@@ -183,10 +246,16 @@ class MachineAssignment {
   // Create new assignment
   static async create(assignmentData) {
     try {
+      // Generate tracking number
+      const trackingNumber = await this.generateTrackingNumber(
+        assignmentData.recordId
+      );
+
       const [assignment] = await db
         .insert(machineAssignments)
         .values({
           ...assignmentData,
+          trackingNumber,
           assignedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -252,6 +321,97 @@ class MachineAssignment {
     }
   }
 
+  // Update tracking numbers for existing assignments that have NULL tracking numbers
+  static async updateNullTrackingNumbers() {
+    try {
+      // Get all assignments with NULL tracking numbers, grouped by recordId
+      const assignmentsWithNullTracking = await db
+        .select()
+        .from(machineAssignments)
+        .where(isNull(machineAssignments.trackingNumber))
+        .orderBy(asc(machineAssignments.recordId), asc(machineAssignments.id));
+
+      if (assignmentsWithNullTracking.length === 0) {
+        return {
+          updated: 0,
+          message: "No assignments with NULL tracking numbers found",
+        };
+      }
+
+      // Group by recordId and update tracking numbers
+      const recordGroups = {};
+      assignmentsWithNullTracking.forEach((assignment) => {
+        if (!recordGroups[assignment.recordId]) {
+          recordGroups[assignment.recordId] = [];
+        }
+        recordGroups[assignment.recordId].push(assignment);
+      });
+
+      let totalUpdated = 0;
+      for (const [recordId, assignments] of Object.entries(recordGroups)) {
+        // Get the order record's tracking number
+        const [record] = await db
+          .select({ trackingNumber: orderRecords.trackingNumber })
+          .from(orderRecords)
+          .where(eq(orderRecords.id, parseInt(recordId)))
+          .limit(1);
+
+        if (!record || !record.trackingNumber) {
+          console.warn(
+            `Skipping record ${recordId} - no tracking number found`
+          );
+          continue;
+        }
+
+        const orderRecordTrackingNumber = record.trackingNumber;
+
+        // Get existing assignment tracking numbers for this record to determine starting number
+        const existingAssignments = await db
+          .select({ trackingNumber: machineAssignments.trackingNumber })
+          .from(machineAssignments)
+          .where(
+            and(
+              eq(machineAssignments.recordId, parseInt(recordId)),
+              ne(machineAssignments.trackingNumber, null)
+            )
+          )
+          .orderBy(desc(machineAssignments.id));
+
+        let nextNumberIndex = 1;
+        if (existingAssignments.length > 0) {
+          // Find the highest number used
+          const lastTrackingNumber = existingAssignments[0].trackingNumber;
+          const lastNumber = parseInt(lastTrackingNumber.slice(-1));
+          nextNumberIndex = lastNumber + 1;
+        }
+
+        // Update each assignment with NULL tracking number
+        for (const assignment of assignments) {
+          const trackingNumber = `${orderRecordTrackingNumber}${nextNumberIndex}`;
+
+          await db
+            .update(machineAssignments)
+            .set({
+              trackingNumber,
+              updatedAt: new Date(),
+            })
+            .where(eq(machineAssignments.id, assignment.id));
+
+          nextNumberIndex++;
+          totalUpdated++;
+        }
+      }
+
+      return {
+        updated: totalUpdated,
+        message: `Updated ${totalUpdated} assignments with tracking numbers`,
+      };
+    } catch (error) {
+      console.error("Error updating NULL tracking numbers:", error);
+      throw error;
+    }
+  }
+
   // Get assignment statistics for a record
   static async getRecordStats(recordId) {
     try {
@@ -297,12 +457,12 @@ class MachineAssignment {
           )
         );
 
-      const totalQuantity = record.quantity;
-      const assignedQuantity = assignedResult.totalAssigned || 0;
+      const totalQuantity = parseInt(record.quantity) || 0;
+      const assignedQuantity = parseInt(assignedResult.totalAssigned) || 0;
       const remainingQuantity = totalQuantity - assignedQuantity;
-      const totalAssignments = totalResult.count;
-      const completedAssignments = completedResult.count;
-      const inProgressAssignments = inProgressResult.count;
+      const totalAssignments = parseInt(totalResult.count) || 0;
+      const completedAssignments = parseInt(completedResult.count) || 0;
+      const inProgressAssignments = parseInt(inProgressResult.count) || 0;
       const completionPercentage =
         totalQuantity > 0
           ? Math.round((assignedQuantity / totalQuantity) * 100)

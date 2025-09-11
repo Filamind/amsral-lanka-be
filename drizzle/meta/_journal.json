@@ -85,6 +85,20 @@
       "when": 1757428070637,
       "tag": "0011_numerous_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1757600783375,
+      "tag": "0012_spotty_goblin_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1757603463603,
+      "tag": "0013_tan_stark_industries",
+      "breakpoints": true
     }
   ]
 }

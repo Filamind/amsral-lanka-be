@@ -20,6 +20,9 @@ router.get("/process-types", OrderController.getProcessTypes);
 // GET /api/orders/records - Get all order records with pagination and filtering
 router.get("/records", OrderController.getAllOrderRecords);
 
+// GET /api/orders/:id/details - Get comprehensive order details with records, assignments, and completion percentage
+router.get("/:id/details", OrderController.getOrderDetails);
+
 // GET /api/orders/:id - Get single order by ID
 router.get("/:id", OrderController.getOrderById);
 

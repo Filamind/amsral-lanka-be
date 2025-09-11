@@ -108,6 +108,8 @@ class Order {
         search = null,
         status = null,
         customerId = null,
+        customerName = null,
+        orderId = null,
         sortBy = "createdAt",
         sortOrder = "desc",
       } = options;
@@ -132,6 +134,16 @@ class Order {
         conditions.push(eq(orders.customerId, customerId));
       }
 
+      if (orderId) {
+        conditions.push(eq(orders.id, orderId));
+      }
+
+      // Handle customer name filtering
+      if (customerName) {
+        // We need to join with customers table to filter by customer name
+        // This will be handled in the query below
+      }
+
       // Build order by
       const orderBy =
         sortOrder === "asc" ? asc(orders[sortBy]) : desc(orders[sortBy]);
@@ -139,24 +151,62 @@ class Order {
       const whereClause =
         conditions.length > 0 ? and(...conditions) : undefined;
 
-      const orderList = await db
-        .select({
-          id: orders.id,
-          date: orders.date,
-          referenceNo: orders.referenceNo,
-          customerId: orders.customerId,
-          quantity: orders.quantity,
-          notes: orders.notes,
-          deliveryDate: orders.deliveryDate,
-          status: orders.status,
-          createdAt: orders.createdAt,
-          updatedAt: orders.updatedAt,
-        })
-        .from(orders)
-        .where(whereClause)
-        .orderBy(orderBy)
-        .limit(limit)
-        .offset(offset);
+      let orderList;
+
+      if (customerName) {
+        // Join with customers table to filter by customer name
+        orderList = await db
+          .select({
+            id: orders.id,
+            date: orders.date,
+            referenceNo: orders.referenceNo,
+            customerId: orders.customerId,
+            quantity: orders.quantity,
+            notes: orders.notes,
+            deliveryDate: orders.deliveryDate,
+            status: orders.status,
+            createdAt: orders.createdAt,
+            updatedAt: orders.updatedAt,
+          })
+          .from(orders)
+          .leftJoin(customers, eq(orders.customerId, customers.id))
+          .where(
+            and(
+              whereClause,
+              or(
+                ilike(customers.firstName, `%${customerName}%`),
+                ilike(customers.lastName, `%${customerName}%`),
+                ilike(
+                  sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+                  `%${customerName}%`
+                )
+              )
+            )
+          )
+          .orderBy(orderBy)
+          .limit(limit)
+          .offset(offset);
+      } else {
+        // Regular query without customer name filtering
+        orderList = await db
+          .select({
+            id: orders.id,
+            date: orders.date,
+            referenceNo: orders.referenceNo,
+            customerId: orders.customerId,
+            quantity: orders.quantity,
+            notes: orders.notes,
+            deliveryDate: orders.deliveryDate,
+            status: orders.status,
+            createdAt: orders.createdAt,
+            updatedAt: orders.updatedAt,
+          })
+          .from(orders)
+          .where(whereClause)
+          .orderBy(orderBy)
+          .limit(limit)
+          .offset(offset);
+      }
 
       // Enhance with customer names, records count, and completion status
       const enhancedOrders = await Promise.all(
@@ -179,7 +229,13 @@ class Order {
   // Count orders with filtering
   static async count(options = {}) {
     try {
-      const { search = null, status = null, customerId = null } = options;
+      const {
+        search = null,
+        status = null,
+        customerId = null,
+        customerName = null,
+        orderId = null,
+      } = options;
 
       const conditions = [];
 
@@ -200,13 +256,41 @@ class Order {
         conditions.push(eq(orders.customerId, customerId));
       }
 
+      if (orderId) {
+        conditions.push(eq(orders.id, orderId));
+      }
+
       const whereClause =
         conditions.length > 0 ? and(...conditions) : undefined;
 
-      const [result] = await db
-        .select({ count: count() })
-        .from(orders)
-        .where(whereClause);
+      let result;
+
+      if (customerName) {
+        // Join with customers table to filter by customer name
+        [result] = await db
+          .select({ count: count() })
+          .from(orders)
+          .leftJoin(customers, eq(orders.customerId, customers.id))
+          .where(
+            and(
+              whereClause,
+              or(
+                ilike(customers.firstName, `%${customerName}%`),
+                ilike(customers.lastName, `%${customerName}%`),
+                ilike(
+                  sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+                  `%${customerName}%`
+                )
+              )
+            )
+          );
+      } else {
+        // Regular count without customer name filtering
+        [result] = await db
+          .select({ count: count() })
+          .from(orders)
+          .where(whereClause);
+      }
 
       return result.count;
     } catch (error) {

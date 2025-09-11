@@ -184,15 +184,19 @@ const orderRecords = pgTable(
     quantity: integer("quantity").notNull(),
     washType: varchar("wash_type", { length: 50 }).notNull(),
     processTypes: json("process_types").notNull(),
+    trackingNumber: varchar("tracking_number", { length: 20 }),
     status: varchar("status", { length: 20 }).notNull().default("Pending"), // "Pending", "Complete"
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
-    orderIdIdx: index("idx_order_id").on(table.orderId),
-    itemIdIdx: index("idx_item_id").on(table.itemId),
-    washTypeIdx: index("idx_wash_type").on(table.washType),
-    statusIdx: index("idx_status").on(table.status),
+    orderIdIdx: index("idx_order_records_order_id").on(table.orderId),
+    itemIdIdx: index("idx_order_records_item_id").on(table.itemId),
+    washTypeIdx: index("idx_order_records_wash_type").on(table.washType),
+    statusIdx: index("idx_order_records_status").on(table.status),
+    trackingNumberIdx: index("idx_order_records_tracking_number").on(
+      table.trackingNumber
+    ),
   })
 );
 
@@ -213,6 +217,7 @@ const machineAssignments = pgTable(
     quantity: integer("quantity").notNull(),
     washingMachine: varchar("washing_machine", { length: 50 }),
     dryingMachine: varchar("drying_machine", { length: 50 }),
+    trackingNumber: varchar("tracking_number", { length: 20 }),
     assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow(),
     status: varchar("status", { length: 20 }).notNull().default("In Progress"), // "In Progress", "Completed", "Cancelled"
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -225,6 +230,9 @@ const machineAssignments = pgTable(
       table.assignedById
     ),
     statusIdx: index("idx_assignment_status").on(table.status),
+    trackingNumberIdx: index("idx_assignment_tracking_number").on(
+      table.trackingNumber
+    ),
   })
 );
 
