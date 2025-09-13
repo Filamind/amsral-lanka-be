@@ -121,18 +121,6 @@ const customers = pgTable("customers", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-// Item Types table schema
-const itemTypes = pgTable("item_types", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-  code: varchar("code", { length: 20 }).unique().notNull(),
-  description: text("description"),
-  category: varchar("category", { length: 50 }),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
-
 // Items table schema
 const items = pgTable(
   "items",
@@ -245,7 +233,6 @@ module.exports = {
   machineTypes,
   processTypes,
   customers,
-  itemTypes,
   items,
   orders,
   orderRecords,

@@ -13,6 +13,7 @@ class User {
     this.lastName = userData.lastName || userData.last_name;
     this.phone = userData.phone;
     this.dateOfBirth = userData.dateOfBirth || userData.date_of_birth;
+    this.passwordHash = userData.passwordHash || userData.password_hash;
     this.roleId = userData.roleId || userData.role_id;
     this.isActive =
       userData.isActive !== undefined ? userData.isActive : userData.is_active;
@@ -111,6 +112,7 @@ class User {
           lastName: users.lastName,
           phone: users.phone,
           dateOfBirth: users.dateOfBirth,
+          passwordHash: users.passwordHash,
           roleId: users.roleId,
           isActive: users.isActive,
           isDeleted: users.isDeleted,
@@ -125,6 +127,20 @@ class User {
         .from(users)
         .leftJoin(roles, eq(users.roleId, roles.id))
         .where(eq(users.id, id));
+
+      if (result.length === 0) {
+        return null;
+      }
+      return new User(result[0]);
+    } catch (error) {
+      throw new Error(`Error fetching user: ${error.message}`);
+    }
+  }
+
+  // Get user by ID with password (for authentication operations)
+  static async findByIdWithPassword(id) {
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id));
 
       if (result.length === 0) {
         return null;
@@ -258,6 +274,9 @@ class User {
       isActive = true,
     } = userData;
 
+    // Convert empty string to null for dateOfBirth
+    const processedDateOfBirth = dateOfBirth === "" ? null : dateOfBirth;
+
     try {
       // Hash password if it's not already hashed
       let hashedPassword = passwordHash;
@@ -274,11 +293,24 @@ class User {
           lastName,
           passwordHash: hashedPassword,
           phone,
-          dateOfBirth,
+          dateOfBirth: processedDateOfBirth,
           roleId,
           isActive,
         })
-        .returning();
+        .returning({
+          id: users.id,
+          username: users.username,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+          dateOfBirth: users.dateOfBirth,
+          roleId: users.roleId,
+          isActive: users.isActive,
+          isDeleted: users.isDeleted,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        });
 
       return new User(result[0]);
     } catch (error) {

@@ -1,5 +1,10 @@
 const { db } = require("../config/db");
-const { orders, orderRecords, customers, machineAssignments } = require("../db/schema");
+const {
+  orders,
+  orderRecords,
+  customers,
+  machineAssignments,
+} = require("../db/schema");
 const {
   eq,
   and,
@@ -93,7 +98,11 @@ class DashboardController {
   static async getAnalytics(req, res) {
     try {
       const { startDate, endDate, period } = req.query;
-      const { start, end } = this.getDateRange(startDate, endDate, period);
+      const { start, end } = DashboardController.getDateRange(
+        startDate,
+        endDate,
+        period
+      );
 
       // Get summary metrics
       const [
@@ -110,29 +119,23 @@ class DashboardController {
           .select({ count: count() })
           .from(orders)
           .where(between(orders.date, start, end)),
-        
+
         // Completed orders
         db
           .select({ count: count() })
           .from(orders)
           .where(
-            and(
-              between(orders.date, start, end),
-              eq(orders.status, "Complete")
-            )
+            and(between(orders.date, start, end), eq(orders.status, "Complete"))
           ),
-        
+
         // Pending orders
         db
           .select({ count: count() })
           .from(orders)
           .where(
-            and(
-              between(orders.date, start, end),
-              eq(orders.status, "Pending")
-            )
+            and(between(orders.date, start, end), eq(orders.status, "Pending"))
           ),
-        
+
         // In Progress orders
         db
           .select({ count: count() })
@@ -143,15 +146,15 @@ class DashboardController {
               eq(orders.status, "In Progress")
             )
           ),
-        
+
         // Daily orders data for trends
-        this.getDailyOrdersData(start, end),
-        
+        DashboardController.getDailyOrdersData(start, end),
+
         // Order status distribution
-        this.getOrderStatusDistribution(start, end),
-        
+        DashboardController.getOrderStatusDistribution(start, end),
+
         // Recent orders
-        this.getRecentOrders(10),
+        DashboardController.getRecentOrders(10),
       ]);
 
       const totalOrders = totalOrdersResult[0]?.count || 0;
@@ -160,8 +163,12 @@ class DashboardController {
       const inProgressOrders = inProgressOrdersResult[0]?.count || 0;
 
       // Calculate total revenue and average order value
-      const totalRevenue = await this.calculateTotalRevenue(start, end);
-      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const totalRevenue = await DashboardController.calculateTotalRevenue(
+        start,
+        end
+      );
+      const averageOrderValue =
+        totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
       res.json({
         success: true,
@@ -186,7 +193,8 @@ class DashboardController {
       res.status(500).json({
         success: false,
         message: "Internal server error",
-        error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
@@ -194,8 +202,20 @@ class DashboardController {
   // GET /api/dashboard/quick-stats - Quick stats only
   static async getQuickStats(req, res) {
     try {
-      const { startDate, endDate, period } = req.query;
-      const { start, end } = this.getDateRange(startDate, endDate, period);
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required",
+        });
+      }
+
+      const { start, end } = DashboardController.getDateRange(
+        startDate,
+        endDate,
+        "month"
+      );
 
       const [
         totalOrdersResult,
@@ -207,27 +227,21 @@ class DashboardController {
           .select({ count: count() })
           .from(orders)
           .where(between(orders.date, start, end)),
-        
+
         db
           .select({ count: count() })
           .from(orders)
           .where(
-            and(
-              between(orders.date, start, end),
-              eq(orders.status, "Complete")
-            )
+            and(between(orders.date, start, end), eq(orders.status, "Complete"))
           ),
-        
+
         db
           .select({ count: count() })
           .from(orders)
           .where(
-            and(
-              between(orders.date, start, end),
-              eq(orders.status, "Pending")
-            )
+            and(between(orders.date, start, end), eq(orders.status, "Pending"))
           ),
-        
+
         db
           .select({ count: count() })
           .from(orders)
@@ -244,8 +258,9 @@ class DashboardController {
       const pendingOrders = pendingOrdersResult[0]?.count || 0;
       const inProgressOrders = inProgressOrdersResult[0]?.count || 0;
 
-      const totalRevenue = await this.calculateTotalRevenue(start, end);
-      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      // Note: Revenue calculations removed since no pricing data exists
+      const totalRevenue = 0;
+      const averageOrderValue = 0;
 
       res.json({
         success: true,
@@ -254,8 +269,8 @@ class DashboardController {
           completedOrders,
           pendingOrders,
           inProgressOrders,
-          totalRevenue: Math.round(totalRevenue),
-          averageOrderValue: Math.round(averageOrderValue),
+          totalRevenue,
+          averageOrderValue,
         },
       });
     } catch (error) {
@@ -263,7 +278,8 @@ class DashboardController {
       res.status(500).json({
         success: false,
         message: "Internal server error",
-        error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
@@ -271,10 +287,24 @@ class DashboardController {
   // GET /api/dashboard/orders-trend - Orders trend data
   static async getOrdersTrend(req, res) {
     try {
-      const { startDate, endDate, period } = req.query;
-      const { start, end } = this.getDateRange(startDate, endDate, period);
+      const { startDate, endDate, period = "month" } = req.query;
 
-      const dailyOrdersData = await this.getDailyOrdersData(start, end);
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required",
+        });
+      }
+
+      const { start, end } = DashboardController.getDateRange(
+        startDate,
+        endDate,
+        period
+      );
+      const dailyOrdersData = await DashboardController.getDailyOrdersData(
+        start,
+        end
+      );
 
       res.json({
         success: true,
@@ -285,7 +315,51 @@ class DashboardController {
       res.status(500).json({
         success: false,
         message: "Internal server error",
-        error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // GET /api/dashboard/orders-count - Orders count data
+  static async getOrdersCount(req, res) {
+    try {
+      const { startDate, endDate, period = "month" } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required",
+        });
+      }
+
+      const { start, end } = DashboardController.getDateRange(
+        startDate,
+        endDate,
+        period
+      );
+      const dailyOrdersData = await DashboardController.getDailyOrdersData(
+        start,
+        end
+      );
+
+      // Return only orders count (without revenue)
+      const ordersCountData = dailyOrdersData.map((item) => ({
+        date: item.date,
+        orders: item.orders,
+      }));
+
+      res.json({
+        success: true,
+        data: ordersCountData,
+      });
+    } catch (error) {
+      console.error("Error in getOrdersCount:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
@@ -293,10 +367,22 @@ class DashboardController {
   // GET /api/dashboard/order-status-distribution - Order status distribution
   static async getOrderStatusDistribution(req, res) {
     try {
-      const { startDate, endDate, period } = req.query;
-      const { start, end } = this.getDateRange(startDate, endDate, period);
+      const { startDate, endDate } = req.query;
 
-      const orderStatusData = await this.getOrderStatusDistribution(start, end);
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required",
+        });
+      }
+
+      const { start, end } = DashboardController.getDateRange(
+        startDate,
+        endDate,
+        "month"
+      );
+      const orderStatusData =
+        await DashboardController.getOrderStatusDistributionData(start, end);
 
       res.json({
         success: true,
@@ -307,7 +393,8 @@ class DashboardController {
       res.status(500).json({
         success: false,
         message: "Internal server error",
-        error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
@@ -318,7 +405,9 @@ class DashboardController {
       const { limit = 10 } = req.query;
       const limitNum = parseInt(limit) || 10;
 
-      const recentOrdersData = await this.getRecentOrders(limitNum);
+      const recentOrdersData = await DashboardController.getRecentOrdersData(
+        limitNum
+      );
 
       res.json({
         success: true,
@@ -329,7 +418,8 @@ class DashboardController {
       res.status(500).json({
         success: false,
         message: "Internal server error",
-        error: process.env.NODE_ENV === "development" ? error.message : undefined,
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
@@ -341,7 +431,6 @@ class DashboardController {
         .select({
           date: sql`DATE(${orders.date})`.as("date"),
           orders: count(),
-          revenue: sql`SUM(${orders.quantity} * 100)`.as("revenue"), // Placeholder calculation
         })
         .from(orders)
         .where(between(orders.date, start, end))
@@ -349,9 +438,9 @@ class DashboardController {
         .orderBy(sql`DATE(${orders.date})`);
 
       return dailyData.map((item) => ({
-        date: item.date.toISOString(),
+        date: item.date, // Already in YYYY-MM-DD format from SQL DATE() function
         orders: parseInt(item.orders),
-        revenue: parseFloat(item.revenue) || 0,
+        revenue: 0, // No pricing data available
       }));
     } catch (error) {
       console.error("Error getting daily orders data:", error);
@@ -360,7 +449,7 @@ class DashboardController {
   }
 
   // Helper method to get order status distribution
-  static async getOrderStatusDistribution(start, end) {
+  static async getOrderStatusDistributionData(start, end) {
     try {
       const statusData = await db
         .select({
@@ -371,12 +460,18 @@ class DashboardController {
         .where(between(orders.date, start, end))
         .groupBy(orders.status);
 
-      const total = statusData.reduce((sum, item) => sum + parseInt(item.count), 0);
+      const total = statusData.reduce(
+        (sum, item) => sum + parseInt(item.count),
+        0
+      );
 
       return statusData.map((item) => ({
         status: item.status,
         count: parseInt(item.count),
-        percentage: total > 0 ? Math.round((parseInt(item.count) / total) * 100 * 10) / 10 : 0,
+        percentage:
+          total > 0
+            ? Math.round((parseInt(item.count) / total) * 100 * 10) / 10
+            : 0,
       }));
     } catch (error) {
       console.error("Error getting order status distribution:", error);
@@ -385,7 +480,7 @@ class DashboardController {
   }
 
   // Helper method to get recent orders
-  static async getRecentOrders(limit) {
+  static async getRecentOrdersData(limit) {
     try {
       const recentOrders = await db
         .select({
@@ -402,9 +497,13 @@ class DashboardController {
       const enhancedOrders = await Promise.all(
         recentOrders.map(async (order) => ({
           id: order.id,
-          customerName: await this.getCustomerName(order.customerId),
+          referenceNo: order.referenceNo,
+          customerName: await DashboardController.getCustomerName(
+            order.customerId
+          ),
           status: order.status,
-          totalAmount: this.calculateOrderRevenue(order),
+          quantity: order.quantity,
+          totalAmount: 0, // No pricing data available
           orderDate: order.orderDate.toISOString(),
         }))
       );

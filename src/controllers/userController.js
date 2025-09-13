@@ -231,7 +231,7 @@ class UserController {
         passwordHash,
         phone,
         dateOfBirth,
-        role = "user",
+        roleId,
         isActive = true,
       } = req.body;
 
@@ -273,12 +273,11 @@ class UserController {
         });
       }
 
-      // Validate role
-      const validRoles = ["admin", "finance", "sales", "user"];
-      if (!validRoles.includes(role)) {
+      // Validate roleId if provided
+      if (roleId && (isNaN(roleId) || roleId < 1)) {
         return res.status(400).json({
           success: false,
-          message: "Invalid role. Must be one of: admin, finance, sales, user",
+          message: "Invalid roleId. Must be a positive number",
         });
       }
 
@@ -290,7 +289,7 @@ class UserController {
         passwordHash,
         phone: phone?.trim() || null,
         dateOfBirth: dateOfBirth || null,
-        role,
+        roleId: roleId ? parseInt(roleId) : null,
         isActive,
       };
 
@@ -306,7 +305,7 @@ class UserController {
           lastName: user.lastName,
           phone: user.phone,
           dateOfBirth: user.dateOfBirth,
-          role: user.role,
+          roleId: user.roleId,
           isActive: user.isActive,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
@@ -343,7 +342,7 @@ class UserController {
         passwordHash,
         phone,
         dateOfBirth,
-        role,
+        roleId,
         isActive,
       } = req.body;
 
@@ -403,16 +402,12 @@ class UserController {
         }
       }
 
-      // Validate role if provided
-      if (role) {
-        const validRoles = ["admin", "finance", "sales", "user"];
-        if (!validRoles.includes(role)) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "Invalid role. Must be one of: admin, finance, sales, user",
-          });
-        }
+      // Validate roleId if provided
+      if (roleId && (isNaN(roleId) || roleId < 1)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid roleId. Must be a positive number",
+        });
       }
 
       const userData = {};
@@ -423,7 +418,8 @@ class UserController {
       if (passwordHash !== undefined) userData.passwordHash = passwordHash;
       if (phone !== undefined) userData.phone = phone?.trim() || null;
       if (dateOfBirth !== undefined) userData.dateOfBirth = dateOfBirth;
-      if (role !== undefined) userData.role = role;
+      if (roleId !== undefined)
+        userData.roleId = roleId ? parseInt(roleId) : null;
       if (isActive !== undefined) userData.isActive = isActive;
 
       const user = await User.update(parseInt(id), userData);
@@ -438,7 +434,7 @@ class UserController {
           lastName: user.lastName,
           phone: user.phone,
           dateOfBirth: user.dateOfBirth,
-          role: user.role,
+          roleId: user.roleId,
           isActive: user.isActive,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
@@ -532,6 +528,303 @@ class UserController {
         });
       }
 
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // PUT /api/users/:id/change-password - Change user password
+  static async changePassword(req, res) {
+    try {
+      const { id } = req.params;
+      const { currentPassword, newPassword } = req.body;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user ID",
+        });
+      }
+
+      // Validate required fields
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password and new password are required",
+        });
+      }
+
+      // Validate new password strength
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "New password must be at least 6 characters long",
+        });
+      }
+
+      // Check if user exists (with password for verification)
+      const existingUser = await User.findByIdWithPassword(parseInt(id));
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Verify current password
+      const bcrypt = require("bcrypt");
+      const isCurrentPasswordValid = await bcrypt.compare(
+        currentPassword,
+        existingUser.passwordHash
+      );
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password is incorrect",
+        });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      const user = await User.update(parseInt(id), {
+        passwordHash: hashedNewPassword,
+      });
+
+      res.json({
+        success: true,
+        message: "Password changed successfully",
+        data: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      });
+    } catch (error) {
+      console.error("Error in changePassword:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // PUT /api/users/:id/change-username - Change username
+  static async changeUsername(req, res) {
+    try {
+      const { id } = req.params;
+      const { username } = req.body;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user ID",
+        });
+      }
+
+      // Validate required fields
+      if (!username) {
+        return res.status(400).json({
+          success: false,
+          message: "Username is required",
+        });
+      }
+
+      // Validate username format
+      if (username.length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: "Username must be at least 3 characters long",
+        });
+      }
+
+      // Check if user exists
+      const existingUser = await User.findById(parseInt(id));
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Check if username already exists (excluding current user)
+      const existingUserByUsername = await User.findByUsername(username.trim());
+      if (
+        existingUserByUsername &&
+        existingUserByUsername.id !== parseInt(id)
+      ) {
+        return res.status(409).json({
+          success: false,
+          message: "Username already exists",
+        });
+      }
+
+      // Update username
+      const user = await User.update(parseInt(id), {
+        username: username.trim(),
+      });
+
+      res.json({
+        success: true,
+        message: "Username changed successfully",
+        data: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      });
+    } catch (error) {
+      console.error("Error in changeUsername:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // PUT /api/users/:id/change-email - Change email
+  static async changeEmail(req, res) {
+    try {
+      const { id } = req.params;
+      const { email } = req.body;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user ID",
+        });
+      }
+
+      // Validate required fields
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is required",
+        });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid email format",
+        });
+      }
+
+      // Check if user exists
+      const existingUser = await User.findById(parseInt(id));
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Check if email already exists (excluding current user)
+      const existingUserByEmail = await User.findByEmail(
+        email.trim().toLowerCase()
+      );
+      if (existingUserByEmail && existingUserByEmail.id !== parseInt(id)) {
+        return res.status(409).json({
+          success: false,
+          message: "Email already exists",
+        });
+      }
+
+      // Update email
+      const user = await User.update(parseInt(id), {
+        email: email.trim().toLowerCase(),
+      });
+
+      res.json({
+        success: true,
+        message: "Email changed successfully",
+        data: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      });
+    } catch (error) {
+      console.error("Error in changeEmail:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // PUT /api/users/:id/profile - Update user profile (personal details)
+  static async updateProfile(req, res) {
+    try {
+      const { id } = req.params;
+      const { firstName, lastName, phone, dateOfBirth } = req.body;
+
+      // Validate ID is a number
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user ID",
+        });
+      }
+
+      // Check if user exists
+      const existingUser = await User.findById(parseInt(id));
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      // Build update data
+      const userData = {};
+      if (firstName !== undefined) userData.firstName = firstName.trim();
+      if (lastName !== undefined) userData.lastName = lastName.trim();
+      if (phone !== undefined) userData.phone = phone?.trim() || null;
+      if (dateOfBirth !== undefined) userData.dateOfBirth = dateOfBirth || null;
+
+      // Update profile
+      const user = await User.update(parseInt(id), userData);
+
+      res.json({
+        success: true,
+        message: "Profile updated successfully",
+        data: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          dateOfBirth: user.dateOfBirth,
+          roleId: user.roleId,
+          isActive: user.isActive,
+          updatedAt: user.updatedAt,
+        },
+      });
+    } catch (error) {
+      console.error("Error in updateProfile:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

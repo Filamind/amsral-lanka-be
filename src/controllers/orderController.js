@@ -946,6 +946,63 @@ class OrderController {
       });
     }
   }
+
+  // Get order summary with customer and records details
+  static async getOrderSummary(req, res) {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid order ID is required",
+        });
+      }
+
+      const orderDetails = await Order.getOrderDetails(parseInt(id));
+
+      if (!orderDetails) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          id: orderDetails.id,
+          customerName: orderDetails.customerName,
+          orderDate: orderDetails.date,
+          totalQuantity: orderDetails.quantity,
+          createdDate: orderDetails.createdAt,
+          referenceNo: orderDetails.referenceNo,
+          deliveryDate: orderDetails.deliveryDate,
+          status: orderDetails.status,
+          notes: orderDetails.notes,
+          records: orderDetails.records.map((record) => ({
+            id: record.id,
+            quantity: record.quantity,
+            washType: record.washType,
+            processTypes: record.processTypes,
+            itemName: record.itemName,
+            itemId: record.itemId,
+            status: record.status,
+            trackingNumber: record.trackingNumber,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+          })),
+        },
+      });
+    } catch (error) {
+      console.error("Error getting order summary:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = OrderController;

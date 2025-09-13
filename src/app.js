@@ -11,7 +11,6 @@ const dryingTypeRoutes = require("./routes/dryingTypeRoutes");
 const machineTypeRoutes = require("./routes/machineTypeRoutes");
 const processTypeRoutes = require("./routes/processTypeRoutes");
 const customerRoutes = require("./routes/customerRoutes");
-const itemTypeRoutes = require("./routes/itemTypeRoutes");
 const itemRoutes = require("./routes/itemRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const validationRoutes = require("./routes/validationRoutes");
@@ -79,7 +78,6 @@ app.use("/api/drying-types", dryingTypeRoutes);
 app.use("/api/machine-types", machineTypeRoutes);
 app.use("/api/process-types", processTypeRoutes);
 app.use("/api/customers", customerRoutes);
-app.use("/api/item-types", itemTypeRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/validation", validationRoutes);
@@ -119,7 +117,6 @@ app.get("/", (req, res) => {
       machineTypes: "/api/machine-types",
       processTypes: "/api/process-types",
       customers: "/api/customers",
-      itemTypes: "/api/item-types",
       items: "/api/items",
       orders: "/api/orders",
       orderById: "/api/orders/:id",
@@ -144,7 +141,8 @@ app.get("/", (req, res) => {
       dashboardAnalytics: "/api/dashboard/analytics",
       dashboardQuickStats: "/api/dashboard/quick-stats",
       dashboardOrdersTrend: "/api/dashboard/orders-trend",
-      dashboardOrderStatusDistribution: "/api/dashboard/order-status-distribution",
+      dashboardOrderStatusDistribution:
+        "/api/dashboard/order-status-distribution",
       dashboardRecentOrders: "/api/dashboard/recent-orders",
       dashboardStats: "/api/dashboard/stats",
       production: "/api/production",
