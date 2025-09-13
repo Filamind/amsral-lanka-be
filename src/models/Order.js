@@ -12,7 +12,7 @@ const {
   sql,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
-const { orders, orderRecords, customers, itemTypes } = require("../db/schema");
+const { orders, orderRecords, customers, items } = require("../db/schema");
 
 class Order {
   // Create a new order
@@ -169,19 +169,31 @@ class Order {
             updatedAt: orders.updatedAt,
           })
           .from(orders)
-          .leftJoin(customers, eq(orders.customerId, customers.id))
+          .leftJoin(
+            customers,
+            sql`${orders.customerId} = CAST(${customers.id} AS TEXT)`
+          )
           .where(
-            and(
-              whereClause,
-              or(
-                ilike(customers.firstName, `%${customerName}%`),
-                ilike(customers.lastName, `%${customerName}%`),
-                ilike(
-                  sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
-                  `%${customerName}%`
+            whereClause
+              ? and(
+                  whereClause,
+                  or(
+                    ilike(customers.firstName, `%${customerName}%`),
+                    ilike(customers.lastName, `%${customerName}%`),
+                    ilike(
+                      sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+                      `%${customerName}%`
+                    )
+                  )
                 )
-              )
-            )
+              : or(
+                  ilike(customers.firstName, `%${customerName}%`),
+                  ilike(customers.lastName, `%${customerName}%`),
+                  ilike(
+                    sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+                    `%${customerName}%`
+                  )
+                )
           )
           .orderBy(orderBy)
           .limit(limit)
@@ -270,19 +282,31 @@ class Order {
         [result] = await db
           .select({ count: count() })
           .from(orders)
-          .leftJoin(customers, eq(orders.customerId, customers.id))
+          .leftJoin(
+            customers,
+            sql`${orders.customerId} = CAST(${customers.id} AS TEXT)`
+          )
           .where(
-            and(
-              whereClause,
-              or(
-                ilike(customers.firstName, `%${customerName}%`),
-                ilike(customers.lastName, `%${customerName}%`),
-                ilike(
-                  sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
-                  `%${customerName}%`
+            whereClause
+              ? and(
+                  whereClause,
+                  or(
+                    ilike(customers.firstName, `%${customerName}%`),
+                    ilike(customers.lastName, `%${customerName}%`),
+                    ilike(
+                      sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+                      `%${customerName}%`
+                    )
+                  )
                 )
-              )
-            )
+              : or(
+                  ilike(customers.firstName, `%${customerName}%`),
+                  ilike(customers.lastName, `%${customerName}%`),
+                  ilike(
+                    sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+                    `%${customerName}%`
+                  )
+                )
           );
       } else {
         // Regular count without customer name filtering
@@ -503,6 +527,78 @@ class Order {
       return updatedOrder;
     } catch (error) {
       console.error("Error updating order status:", error);
+      throw error;
+    }
+  }
+
+  // Get detailed order information with customer and records
+  static async getOrderDetails(orderId) {
+    try {
+      // Get order information
+      const order = await this.findById(orderId);
+      if (!order) {
+        return null;
+      }
+
+      // Get customer name
+      let customerName = null;
+      try {
+        const [customer] = await db
+          .select({
+            firstName: customers.firstName,
+            lastName: customers.lastName,
+          })
+          .from(customers)
+          .where(eq(customers.id, parseInt(order.customerId)));
+
+        if (customer) {
+          customerName = `${customer.firstName} ${customer.lastName}`;
+        }
+      } catch (error) {
+        console.log(
+          `Could not fetch customer name for customerId: ${order.customerId}`
+        );
+      }
+
+      // Get order records
+      const records = await db
+        .select()
+        .from(orderRecords)
+        .where(eq(orderRecords.orderId, orderId))
+        .orderBy(asc(orderRecords.id));
+
+      // Get item names for each record
+      const recordsWithItemNames = await Promise.all(
+        records.map(async (record) => {
+          let itemName = null;
+          if (record.itemId) {
+            try {
+              const [item] = await db
+                .select({ name: items.name })
+                .from(items)
+                .where(eq(items.id, record.itemId));
+              itemName = item?.name || null;
+            } catch (error) {
+              console.log(
+                `Could not fetch item name for itemId: ${record.itemId}`
+              );
+            }
+          }
+
+          return {
+            ...record,
+            itemName,
+          };
+        })
+      );
+
+      return {
+        ...order,
+        customerName,
+        records: recordsWithItemNames,
+      };
+    } catch (error) {
+      console.error("Error getting order details:", error);
       throw error;
     }
   }

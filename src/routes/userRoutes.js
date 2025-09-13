@@ -24,6 +24,18 @@ router.put("/:id", UserController.updateUser);
 // PUT /api/users/:id/restore - Restore deleted user
 router.put("/:id/restore", UserController.restoreUser);
 
+// PUT /api/users/:id/change-password - Change user password
+router.put("/:id/change-password", UserController.changePassword);
+
+// PUT /api/users/:id/change-username - Change username
+router.put("/:id/change-username", UserController.changeUsername);
+
+// PUT /api/users/:id/change-email - Change email
+router.put("/:id/change-email", UserController.changeEmail);
+
+// PUT /api/users/:id/profile - Update user profile (personal details)
+router.put("/:id/profile", UserController.updateProfile);
+
 // DELETE /api/users/:id - Delete user (soft delete)
 router.delete("/:id", UserController.deleteUser);
 

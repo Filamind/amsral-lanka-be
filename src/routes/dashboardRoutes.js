@@ -12,8 +12,14 @@ router.get("/quick-stats", DashboardController.getQuickStats);
 // GET /api/dashboard/orders-trend - Orders trend data
 router.get("/orders-trend", DashboardController.getOrdersTrend);
 
+// GET /api/dashboard/orders-count - Orders count data
+router.get("/orders-count", DashboardController.getOrdersCount);
+
 // GET /api/dashboard/order-status-distribution - Order status distribution
-router.get("/order-status-distribution", DashboardController.getOrderStatusDistribution);
+router.get(
+  "/order-status-distribution",
+  DashboardController.getOrderStatusDistribution
+);
 
 // GET /api/dashboard/recent-orders - Recent orders
 router.get("/recent-orders", DashboardController.getRecentOrders);

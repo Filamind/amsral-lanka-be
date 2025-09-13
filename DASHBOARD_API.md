@@ -314,3 +314,4 @@ The dashboard should respect user roles:
 - Add authentication middleware if not already present
 - Add role-based access control if needed
 - Consider adding data validation for query parameters
+

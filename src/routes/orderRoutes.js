@@ -23,6 +23,9 @@ router.get("/records", OrderController.getAllOrderRecords);
 // GET /api/orders/:id/details - Get comprehensive order details with records, assignments, and completion percentage
 router.get("/:id/details", OrderController.getOrderDetails);
 
+// GET /api/orders/:id/summary - Get order summary with customer and records details
+router.get("/:id/summary", OrderController.getOrderSummary);
+
 // GET /api/orders/:id - Get single order by ID
 router.get("/:id", OrderController.getOrderById);
 
