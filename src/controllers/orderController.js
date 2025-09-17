@@ -1,6 +1,13 @@
 const Order = require("../models/Order");
 const OrderRecord = require("../models/OrderRecord");
 const { db } = require("../config/db");
+const { eq, asc, inArray } = require("drizzle-orm");
+const {
+  customers,
+  items,
+  processTypes,
+  orderRecords,
+} = require("../db/schema");
 
 class OrderController {
   // PUT /api/orders/:orderId/records/:recordId - Update order record
@@ -998,6 +1005,151 @@ class OrderController {
       });
     } catch (error) {
       console.error("Error getting order summary:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // GET /api/orders/:id/records-details - Get order details with records and remaining quantity
+  static async getOrderRecordsDetails(req, res) {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid order ID is required",
+        });
+      }
+
+      const orderId = parseInt(id);
+
+      // Get order details
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+
+      // Get customer name
+      let customerName = null;
+      try {
+        const [customer] = await db
+          .select({
+            firstName: customers.firstName,
+            lastName: customers.lastName,
+          })
+          .from(customers)
+          .where(eq(customers.id, parseInt(order.customerId)));
+
+        if (customer) {
+          customerName = `${customer.firstName} ${customer.lastName}`;
+        }
+      } catch (error) {
+        console.log(
+          `Could not fetch customer name for customerId: ${order.customerId}`
+        );
+      }
+
+      // Get order records with item names and process type names
+      const records = await db
+        .select({
+          id: orderRecords.id,
+          orderId: orderRecords.orderId,
+          itemId: orderRecords.itemId,
+          quantity: orderRecords.quantity,
+          washType: orderRecords.washType,
+          processTypes: orderRecords.processTypes,
+          trackingNumber: orderRecords.trackingNumber,
+          status: orderRecords.status,
+          createdAt: orderRecords.createdAt,
+          updatedAt: orderRecords.updatedAt,
+        })
+        .from(orderRecords)
+        .where(eq(orderRecords.orderId, orderId))
+        .orderBy(asc(orderRecords.id));
+
+      // Get item names and process type names for each record
+      const recordsWithDetails = await Promise.all(
+        records.map(async (record) => {
+          let itemName = null;
+          if (record.itemId) {
+            try {
+              const [item] = await db
+                .select({ name: items.name })
+                .from(items)
+                .where(eq(items.id, record.itemId));
+              itemName = item?.name || null;
+            } catch (error) {
+              console.log(
+                `Could not fetch item name for itemId: ${record.itemId}`
+              );
+            }
+          }
+
+          // Get process type names
+          let processTypeNames = [];
+          if (record.processTypes && Array.isArray(record.processTypes)) {
+            try {
+              const processTypeDetails = await db
+                .select({
+                  id: processTypes.id,
+                  name: processTypes.name,
+                  code: processTypes.code,
+                })
+                .from(processTypes)
+                .where(inArray(processTypes.code, record.processTypes));
+
+              processTypeNames = processTypeDetails.map((pt) => pt.name);
+            } catch (error) {
+              console.log(
+                `Could not fetch process type names for codes: ${record.processTypes}`
+              );
+            }
+          }
+
+          return {
+            trackingId: record.trackingNumber,
+            itemName: itemName,
+            washType: record.washType,
+            processType: processTypeNames.join(", "), // Join multiple process types with comma
+            quantity: record.quantity,
+            status: record.status,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+          };
+        })
+      );
+
+      // Calculate total quantity from records
+      const totalRecordsQuantity = recordsWithDetails.reduce(
+        (sum, record) => sum + (record.quantity || 0),
+        0
+      );
+
+      // Calculate remaining quantity
+      const remainingQuantity = Math.max(
+        0,
+        order.quantity - totalRecordsQuantity
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          orderId: order.id,
+          customerName: customerName,
+          orderQuantity: order.quantity,
+          orderRecords: recordsWithDetails,
+          remainingQuantity: remainingQuantity,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting order records details:", error);
       return res.status(500).json({
         success: false,
         message: "Internal server error",
