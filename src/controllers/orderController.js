@@ -222,6 +222,7 @@ class OrderController {
         notes: order.notes,
         deliveryDate: order.deliveryDate,
         status: order.status,
+        billingStatus: order.billingStatus || "pending",
         recordsCount: order.recordsCount || 0,
         complete: order.complete || false,
         createdAt: order.createdAt,
@@ -979,6 +980,7 @@ class OrderController {
           referenceNo: orderDetails.referenceNo,
           deliveryDate: orderDetails.deliveryDate,
           status: orderDetails.status,
+          billingStatus: orderDetails.billingStatus || "pending",
           notes: orderDetails.notes,
           records: orderDetails.records.map((record) => ({
             id: record.id,

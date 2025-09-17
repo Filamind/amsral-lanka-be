@@ -183,6 +183,77 @@ export const machineAssignments = pgTable("machine_assignments", {
 		}).onDelete("set null"),
 ]);
 
+export const invoices = pgTable("invoices", {
+	id: serial().primaryKey().notNull(),
+	invoiceNumber: varchar("invoice_number", { length: 50 }).notNull(),
+	customerId: varchar("customer_id", { length: 50 }).notNull(),
+	customerName: varchar("customer_name", { length: 255 }).notNull(),
+	orderIds: json("order_ids").notNull(),
+	subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+	taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).notNull(),
+	taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull(),
+	total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+	paymentTerms: integer("payment_terms").notNull(),
+	dueDate: date("due_date").notNull(),
+	status: varchar({ length: 20 }).default('draft'),
+	paymentDate: date("payment_date"),
+	paymentMethod: varchar("payment_method", { length: 50 }),
+	paymentReference: varchar("payment_reference", { length: 255 }),
+	notes: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_invoice_number").using("btree", table.invoiceNumber.asc().nullsLast().op("text_ops")),
+	index("idx_invoice_customer_id").using("btree", table.customerId.asc().nullsLast().op("text_ops")),
+	index("idx_invoice_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	index("idx_invoice_due_date").using("btree", table.dueDate.asc().nullsLast().op("date_ops")),
+	unique("invoices_invoice_number_unique").on(table.invoiceNumber),
+]);
+
+export const invoiceRecords = pgTable("invoice_records", {
+	id: serial().primaryKey().notNull(),
+	invoiceId: integer("invoice_id").notNull(),
+	orderId: integer("order_id").notNull(),
+	recordId: integer("record_id").notNull(),
+	unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+	totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_invoice_records_invoice_id").using("btree", table.invoiceId.asc().nullsLast().op("int4_ops")),
+	index("idx_invoice_records_order_id").using("btree", table.orderId.asc().nullsLast().op("int4_ops")),
+	index("idx_invoice_records_record_id").using("btree", table.recordId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.invoiceId],
+			foreignColumns: [invoices.id],
+			name: "invoice_records_invoice_id_invoices_id_fk"
+		}).onDelete("cascade"),
+]);
+
+export const orderPricingHistory = pgTable("order_pricing_history", {
+	id: serial().primaryKey().notNull(),
+	orderId: integer("order_id").notNull(),
+	totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	createdBy: varchar("created_by", { length: 255 }),
+	notes: text(),
+}, (table) => [
+	index("idx_pricing_history_order_id").using("btree", table.orderId.asc().nullsLast().op("int4_ops")),
+]);
+
+export const orderRecordPricingHistory = pgTable("order_record_pricing_history", {
+	id: serial().primaryKey().notNull(),
+	orderId: integer("order_id").notNull(),
+	recordId: integer("record_id").notNull(),
+	unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+	totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	createdBy: varchar("created_by", { length: 255 }),
+	notes: text(),
+}, (table) => [
+	index("idx_record_pricing_history_order_id").using("btree", table.orderId.asc().nullsLast().op("int4_ops")),
+	index("idx_record_pricing_history_record_id").using("btree", table.recordId.asc().nullsLast().op("int4_ops")),
+]);
+
 export const orders = pgTable("orders", {
 	id: serial().primaryKey().notNull(),
 	date: date().notNull(),
@@ -192,6 +263,8 @@ export const orders = pgTable("orders", {
 	notes: text(),
 	deliveryDate: date("delivery_date").notNull(),
 	status: varchar({ length: 20 }).default('Pending'),
+	amount: decimal("amount", { precision: 10, scale: 2 }).default('0.00'),
+	isPaid: boolean("is_paid").default(false),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
@@ -214,6 +287,9 @@ export const orderRecords = pgTable("order_records", {
 	itemId: varchar("item_id", { length: 50 }),
 	status: varchar({ length: 20 }).default('Pending').notNull(),
 	trackingNumber: varchar("tracking_number", { length: 20 }),
+	unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).default('0.00'),
+	totalPrice: decimal("total_price", { precision: 10, scale: 2 }).default('0.00'),
+	isPaid: boolean("is_paid").default(false),
 }, (table) => [
 	index("idx_order_records_item_id").using("btree", table.itemId.asc().nullsLast().op("text_ops")),
 	index("idx_order_records_order_id").using("btree", table.orderId.asc().nullsLast().op("int4_ops")),
