@@ -87,10 +87,13 @@ class DashboardController {
     }
   }
 
-  // Helper method to calculate order revenue (placeholder - you may need to implement actual pricing logic)
+  // Helper method to calculate order revenue
   static calculateOrderRevenue(order) {
-    // This is a placeholder calculation
-    // You may need to implement actual pricing based on your business logic
+    // Use the actual amount from the order if available, otherwise fallback to calculation
+    if (order.amount && parseFloat(order.amount) > 0) {
+      return parseFloat(order.amount);
+    }
+    // Fallback calculation if amount is not set
     return order.quantity * 100; // Assuming 100 per unit as base price
   }
 
@@ -431,6 +434,10 @@ class DashboardController {
         .select({
           date: sql`DATE(${orders.date})`.as("date"),
           orders: count(),
+          revenue:
+            sql`SUM(COALESCE(${orders.amount}, ${orders.quantity} * 100))`.as(
+              "revenue"
+            ), // Use actual amount or fallback calculation
         })
         .from(orders)
         .where(between(orders.date, start, end))
@@ -520,7 +527,10 @@ class DashboardController {
     try {
       const [result] = await db
         .select({
-          totalRevenue: sql`SUM(${orders.quantity} * 100)`.as("totalRevenue"), // Placeholder calculation
+          totalRevenue:
+            sql`SUM(COALESCE(${orders.amount}, ${orders.quantity} * 100))`.as(
+              "totalRevenue"
+            ), // Use actual amount or fallback calculation
         })
         .from(orders)
         .where(between(orders.date, start, end));

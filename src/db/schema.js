@@ -121,6 +121,18 @@ const customers = pgTable("customers", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// Item Types table schema
+const itemTypes = pgTable("item_types", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  code: varchar("code", { length: 20 }).unique().notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 // Items table schema
 const items = pgTable(
   "items",
@@ -148,6 +160,9 @@ const orders = pgTable(
     notes: text("notes"),
     deliveryDate: date("delivery_date").notNull(),
     status: varchar("status", { length: 20 }).default("Pending"),
+    billingStatus: varchar("billing_status", { length: 20 }).default("pending"), // "pending", "invoiced", "paid"
+    amount: decimal("amount", { precision: 10, scale: 2 }).default("0.00"),
+    isPaid: boolean("is_paid").default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
@@ -155,6 +170,7 @@ const orders = pgTable(
     referenceNoIdx: index("idx_reference_no").on(table.referenceNo),
     customerIdIdx: index("idx_customer_id").on(table.customerId),
     statusIdx: index("idx_status").on(table.status),
+    billingStatusIdx: index("idx_billing_status").on(table.billingStatus),
     dateIdx: index("idx_date").on(table.date),
     deliveryDateIdx: index("idx_delivery_date").on(table.deliveryDate),
   })
@@ -174,6 +190,13 @@ const orderRecords = pgTable(
     processTypes: json("process_types").notNull(),
     trackingNumber: varchar("tracking_number", { length: 20 }),
     status: varchar("status", { length: 20 }).notNull().default("Pending"), // "Pending", "Complete"
+    unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).default(
+      "0.00"
+    ),
+    totalPrice: decimal("total_price", { precision: 10, scale: 2 }).default(
+      "0.00"
+    ),
+    isPaid: boolean("is_paid").default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
@@ -224,6 +247,95 @@ const machineAssignments = pgTable(
   })
 );
 
+// Invoices table schema
+const invoices = pgTable(
+  "invoices",
+  {
+    id: serial("id").primaryKey(),
+    invoiceNumber: varchar("invoice_number", { length: 50 }).unique().notNull(),
+    customerId: varchar("customer_id", { length: 50 }).notNull(),
+    customerName: varchar("customer_name", { length: 255 }).notNull(),
+    orderIds: json("order_ids").notNull(), // Array of order IDs
+    subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+    taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).notNull(),
+    taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).notNull(),
+    total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+    paymentTerms: integer("payment_terms").notNull(),
+    dueDate: date("due_date").notNull(),
+    status: varchar("status", { length: 20 }).default("draft"), // "draft", "sent", "paid", "overdue"
+    paymentDate: date("payment_date"),
+    paymentMethod: varchar("payment_method", { length: 50 }),
+    paymentReference: varchar("payment_reference", { length: 255 }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    invoiceNumberIdx: index("idx_invoice_number").on(table.invoiceNumber),
+    customerIdIdx: index("idx_invoice_customer_id").on(table.customerId),
+    statusIdx: index("idx_invoice_status").on(table.status),
+    dueDateIdx: index("idx_invoice_due_date").on(table.dueDate),
+  })
+);
+
+// Invoice Records table schema
+const invoiceRecords = pgTable(
+  "invoice_records",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id")
+      .references(() => invoices.id, { onDelete: "cascade" })
+      .notNull(),
+    orderId: integer("order_id").notNull(),
+    recordId: integer("record_id").notNull(),
+    unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+    totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    invoiceIdIdx: index("idx_invoice_records_invoice_id").on(table.invoiceId),
+    orderIdIdx: index("idx_invoice_records_order_id").on(table.orderId),
+    recordIdIdx: index("idx_invoice_records_record_id").on(table.recordId),
+  })
+);
+
+// Order Pricing History table schema
+const orderPricingHistory = pgTable(
+  "order_pricing_history",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").notNull(),
+    totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    createdBy: varchar("created_by", { length: 255 }),
+    notes: text("notes"),
+  },
+  (table) => ({
+    orderIdIdx: index("idx_pricing_history_order_id").on(table.orderId),
+  })
+);
+
+// Order Record Pricing History table schema
+const orderRecordPricingHistory = pgTable(
+  "order_record_pricing_history",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id").notNull(),
+    recordId: integer("record_id").notNull(),
+    unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+    totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    createdBy: varchar("created_by", { length: 255 }),
+    notes: text("notes"),
+  },
+  (table) => ({
+    orderIdIdx: index("idx_record_pricing_history_order_id").on(table.orderId),
+    recordIdIdx: index("idx_record_pricing_history_record_id").on(
+      table.recordId
+    ),
+  })
+);
+
 module.exports = {
   roles,
   users,
@@ -233,8 +345,13 @@ module.exports = {
   machineTypes,
   processTypes,
   customers,
+  itemTypes,
   items,
   orders,
   orderRecords,
   machineAssignments,
+  invoices,
+  invoiceRecords,
+  orderPricingHistory,
+  orderRecordPricingHistory,
 };

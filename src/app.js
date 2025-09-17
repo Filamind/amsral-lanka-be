@@ -19,6 +19,7 @@ const productionRoutes = require("./routes/productionRoutes");
 const referenceRoutes = require("./routes/referenceRoutes");
 const recordRoutes = require("./routes/recordRoutes");
 const machineAssignmentRoutes = require("./routes/machineAssignmentRoutes");
+const billingRoutes = require("./routes/billingRoutes");
 
 // Import database connection
 const { pool } = require("./config/db");
@@ -87,6 +88,7 @@ app.use("/api/reference", referenceRoutes);
 app.use("/api/records", machineAssignmentRoutes);
 app.use("/api/records", recordRoutes);
 app.use("/api", machineAssignmentRoutes);
+app.use("/api/billing", billingRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -147,6 +149,11 @@ app.get("/", (req, res) => {
       dashboardStats: "/api/dashboard/stats",
       production: "/api/production",
       reference: "/api/reference",
+      billing: "/api/billing",
+      billingOrders: "/api/billing/orders",
+      billingInvoices: "/api/billing/invoices",
+      billingStats: "/api/billing/stats",
+      billingOverdue: "/api/billing/invoices/overdue",
     },
   });
 });

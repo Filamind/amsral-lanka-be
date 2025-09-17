@@ -26,6 +26,9 @@ router.get("/:id/details", OrderController.getOrderDetails);
 // GET /api/orders/:id/summary - Get order summary with customer and records details
 router.get("/:id/summary", OrderController.getOrderSummary);
 
+// GET /api/orders/:id/records-details - Get order details with records and remaining quantity
+router.get("/:id/records-details", OrderController.getOrderRecordsDetails);
+
 // GET /api/orders/:id - Get single order by ID
 router.get("/:id", OrderController.getOrderById);
 

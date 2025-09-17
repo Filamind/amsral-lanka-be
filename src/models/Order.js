@@ -60,6 +60,9 @@ class Order {
           notes: orders.notes,
           deliveryDate: orders.deliveryDate,
           status: orders.status,
+          billingStatus: orders.billingStatus,
+          amount: orders.amount,
+          isPaid: orders.isPaid,
           createdAt: orders.createdAt,
           updatedAt: orders.updatedAt,
         })
@@ -165,6 +168,9 @@ class Order {
             notes: orders.notes,
             deliveryDate: orders.deliveryDate,
             status: orders.status,
+            billingStatus: orders.billingStatus,
+            amount: orders.amount,
+            isPaid: orders.isPaid,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
           })
@@ -210,6 +216,9 @@ class Order {
             notes: orders.notes,
             deliveryDate: orders.deliveryDate,
             status: orders.status,
+            billingStatus: orders.billingStatus,
+            amount: orders.amount,
+            isPaid: orders.isPaid,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
           })
