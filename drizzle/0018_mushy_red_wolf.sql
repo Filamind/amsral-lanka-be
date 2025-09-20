@@ -1,0 +1,1 @@
+ALTER TABLE "customers" ADD COLUMN "increment_number" integer DEFAULT 0;

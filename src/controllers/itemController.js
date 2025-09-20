@@ -102,10 +102,10 @@ class ItemController {
   // POST /api/items - Create new item
   static async createItem(req, res) {
     try {
-      const { name, description } = req.body;
+      const { name, code, description } = req.body;
 
       // Validate input data
-      const validation = Item.validateItemData({ name, description });
+      const validation = Item.validateItemData({ name, code, description });
       if (!validation.isValid) {
         return res.status(400).json({
           success: false,
@@ -116,6 +116,7 @@ class ItemController {
 
       const itemData = {
         name: name.trim(),
+        code: code?.trim() || null,
         description: description?.trim() || null,
       };
 
@@ -139,6 +140,16 @@ class ItemController {
         });
       }
 
+      if (error.message === "Item code already exists") {
+        return res.status(409).json({
+          success: false,
+          message: "Validation failed",
+          errors: {
+            code_unique: "Item code already exists",
+          },
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -152,7 +163,7 @@ class ItemController {
   static async updateItem(req, res) {
     try {
       const { id } = req.params;
-      const { name, description } = req.body;
+      const { name, code, description } = req.body;
 
       if (!id || id.trim().length === 0) {
         return res.status(400).json({
@@ -162,7 +173,10 @@ class ItemController {
       }
 
       // Validate input data
-      const validation = Item.validateItemData({ name, description }, true);
+      const validation = Item.validateItemData(
+        { name, code, description },
+        true
+      );
       if (!validation.isValid) {
         return res.status(400).json({
           success: false,
@@ -173,6 +187,7 @@ class ItemController {
 
       const updateData = {};
       if (name !== undefined) updateData.name = name.trim();
+      if (code !== undefined) updateData.code = code?.trim() || null;
       if (description !== undefined)
         updateData.description = description?.trim() || null;
 
@@ -199,6 +214,16 @@ class ItemController {
           message: "Validation failed",
           errors: {
             name_unique: "Item name already exists",
+          },
+        });
+      }
+
+      if (error.message === "Item code already exists") {
+        return res.status(409).json({
+          success: false,
+          message: "Validation failed",
+          errors: {
+            code_unique: "Item code already exists",
           },
         });
       }
@@ -300,6 +325,7 @@ class ItemController {
         value: item.id,
         label: item.name,
         name: item.name,
+        code: item.code,
         description: item.description,
       }));
 

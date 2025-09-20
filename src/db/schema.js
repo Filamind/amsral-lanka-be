@@ -115,6 +115,7 @@ const customers = pgTable("customers", {
   country: varchar("country", { length: 100 }),
   dateOfBirth: date("date_of_birth"),
   notes: text("notes"),
+  incrementNumber: integer("increment_number").default(0), // Counter for invoice numbers
   isActive: boolean("is_active").default(true),
   isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -139,12 +140,14 @@ const items = pgTable(
   {
     id: varchar("id", { length: 50 }).primaryKey(),
     name: varchar("name", { length: 255 }).notNull().unique(),
+    code: varchar("code", { length: 50 }).unique(), // Item code - optional
     description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
     nameIdx: index("idx_items_name").on(table.name),
+    codeIdx: index("idx_items_code").on(table.code),
   })
 );
 
@@ -163,6 +166,8 @@ const orders = pgTable(
     billingStatus: varchar("billing_status", { length: 20 }).default("pending"), // "pending", "invoiced", "paid"
     amount: decimal("amount", { precision: 10, scale: 2 }).default("0.00"),
     isPaid: boolean("is_paid").default(false),
+    gpNo: varchar("gp_no", { length: 100 }), // GP Number - optional
+    invoiceNo: varchar("invoice_no", { length: 100 }), // Invoice Number - generated
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
@@ -173,6 +178,8 @@ const orders = pgTable(
     billingStatusIdx: index("idx_billing_status").on(table.billingStatus),
     dateIdx: index("idx_date").on(table.date),
     deliveryDateIdx: index("idx_delivery_date").on(table.deliveryDate),
+    gpNoIdx: index("idx_gp_no").on(table.gpNo),
+    invoiceNoIdx: index("idx_invoice_no").on(table.invoiceNo),
   })
 );
 

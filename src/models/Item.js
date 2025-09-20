@@ -12,6 +12,14 @@ class Item {
         throw new Error("Item name already exists");
       }
 
+      // Check if item code already exists (if provided)
+      if (itemData.code && itemData.code.trim() !== "") {
+        const existingCode = await this.findByCode(itemData.code);
+        if (existingCode) {
+          throw new Error("Item code already exists");
+        }
+      }
+
       // Generate item ID
       const id = await this.generateItemId();
 
@@ -60,6 +68,22 @@ class Item {
       return item || null;
     } catch (error) {
       console.error("Error finding item by name:", error);
+      throw error;
+    }
+  }
+
+  // Find item by code
+  static async findByCode(code) {
+    try {
+      const [item] = await db
+        .select()
+        .from(items)
+        .where(eq(items.code, code))
+        .limit(1);
+
+      return item || null;
+    } catch (error) {
+      console.error("Error finding item by code:", error);
       throw error;
     }
   }
@@ -160,6 +184,17 @@ class Item {
         const existingName = await this.findByName(updateData.name);
         if (existingName) {
           throw new Error("Item name already exists");
+        }
+      }
+
+      // Check if code already exists (if being updated)
+      if (
+        updateData.code &&
+        updateData.code !== existingItem.code
+      ) {
+        const existingCode = await this.findByCode(updateData.code);
+        if (existingCode) {
+          throw new Error("Item code already exists");
         }
       }
 
@@ -266,6 +301,15 @@ class Item {
         errors.name = "Item name is required";
       } else if (data.name.length > 255) {
         errors.name = "Item name must not exceed 255 characters";
+      }
+    }
+
+    // Code validation
+    if (data.code !== undefined && data.code !== null) {
+      if (typeof data.code !== "string") {
+        errors.code = "Code must be a string";
+      } else if (data.code.trim() !== "" && data.code.length > 50) {
+        errors.code = "Code must not exceed 50 characters";
       }
     }
 

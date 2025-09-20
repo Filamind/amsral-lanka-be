@@ -20,6 +20,12 @@ router.get("/process-types", OrderController.getProcessTypes);
 // GET /api/orders/records - Get all order records with pagination and filtering
 router.get("/records", OrderController.getAllOrderRecords);
 
+// GET /api/orders/invoice-preview/:customerId - Get next invoice number for a customer
+router.get("/invoice-preview/:customerId", OrderController.getInvoicePreview);
+
+// POST /api/orders/generate-invoice-batch - Generate invoice number for multiple orders
+router.post("/generate-invoice-batch", OrderController.generateInvoiceBatch);
+
 // GET /api/orders/:id/details - Get comprehensive order details with records, assignments, and completion percentage
 router.get("/:id/details", OrderController.getOrderDetails);
 

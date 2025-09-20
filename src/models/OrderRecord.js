@@ -10,6 +10,7 @@ const {
   ne,
   sum,
   isNull,
+  sql,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
 const {
@@ -171,9 +172,28 @@ class OrderRecord {
         conditions.length > 0 ? and(...conditions) : undefined;
 
       const recordList = await db
-        .select()
+        .select({
+          id: orderRecords.id,
+          orderId: orderRecords.orderId,
+          itemId: orderRecords.itemId,
+          quantity: orderRecords.quantity,
+          unitPrice: orderRecords.unitPrice,
+          totalPrice: orderRecords.totalPrice,
+          washType: orderRecords.washType,
+          processTypes: orderRecords.processTypes,
+          status: orderRecords.status,
+          trackingNumber: orderRecords.trackingNumber,
+          createdAt: orderRecords.createdAt,
+          updatedAt: orderRecords.updatedAt,
+        })
         .from(orderRecords)
-        .where(whereClause)
+        .leftJoin(orders, eq(orderRecords.orderId, orders.id))
+        .where(
+          and(
+            whereClause,
+            sql`${orders.status} != 'Delivered'` // Exclude records from delivered orders
+          )
+        )
         .orderBy(orderBy)
         .limit(limit)
         .offset(offset);
@@ -230,7 +250,13 @@ class OrderRecord {
       const [result] = await db
         .select({ count: count() })
         .from(orderRecords)
-        .where(whereClause);
+        .leftJoin(orders, eq(orderRecords.orderId, orders.id))
+        .where(
+          and(
+            whereClause,
+            sql`${orders.status} != 'Delivered'` // Exclude records from delivered orders
+          )
+        );
 
       return result.count;
     } catch (error) {
