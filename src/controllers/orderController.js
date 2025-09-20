@@ -199,6 +199,7 @@ class OrderController {
         customerId = null,
         customerName = null,
         orderId = null,
+        excludeDelivered = false,
       } = req.query;
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -211,6 +212,7 @@ class OrderController {
         customerId,
         customerName,
         orderId: orderId ? parseInt(orderId) : null,
+        excludeDelivered: excludeDelivered === "true",
       };
 
       // Get orders and total count
@@ -342,10 +344,28 @@ class OrderController {
           // Check if record is complete
           const isComplete = await OrderRecord.isRecordComplete(record.id);
 
+          // Get item name
+          let itemName = null;
+          if (record.itemId) {
+            try {
+              const [item] = await db
+                .select({ name: items.name })
+                .from(items)
+                .where(eq(items.id, record.itemId))
+                .limit(1);
+              itemName = item?.name || null;
+            } catch (error) {
+              console.log(
+                `Could not fetch item name for itemId: ${record.itemId}`
+              );
+            }
+          }
+
           return {
             id: record.id,
             orderId: record.orderId,
             itemId: record.itemId,
+            itemName: itemName,
             quantity: record.quantity,
             washType: record.washType,
             processTypes: record.processTypes,
@@ -511,6 +531,7 @@ class OrderController {
         quantity,
         notes,
         deliveryDate,
+        gpNo,
         records = [],
       } = req.body;
 
@@ -564,6 +585,9 @@ class OrderController {
 
       // Start transaction
       const result = await db.transaction(async (tx) => {
+        // Generate invoice number
+        const invoiceNo = await Order.generateInvoiceNumber(customerId);
+
         // Create order
         const orderData = {
           date: new Date(date),
@@ -572,6 +596,8 @@ class OrderController {
           notes,
           deliveryDate: new Date(deliveryDate),
           status: "Pending",
+          gpNo: gpNo || null,
+          invoiceNo: invoiceNo,
         };
 
         const order = await Order.create(orderData);
@@ -633,6 +659,7 @@ class OrderController {
         notes,
         deliveryDate,
         status,
+        gpNo,
         records = [],
       } = req.body;
 
@@ -701,6 +728,7 @@ class OrderController {
         if (notes !== undefined) orderUpdateData.notes = notes;
         if (deliveryDate) orderUpdateData.deliveryDate = new Date(deliveryDate);
         if (status) orderUpdateData.status = status;
+        if (gpNo !== undefined) orderUpdateData.gpNo = gpNo;
 
         const updatedOrder = await Order.update(id, orderUpdateData);
 
@@ -976,10 +1004,26 @@ class OrderController {
         });
       }
 
+      // Generate invoice number for existing orders that don't have one
+      if (!orderDetails.invoiceNo) {
+        try {
+          const invoiceNo = await Order.generateInvoiceNumberForExistingOrder(
+            parseInt(id)
+          );
+          orderDetails.invoiceNo = invoiceNo;
+        } catch (error) {
+          console.log(
+            `Could not generate invoice number for order ${id}:`,
+            error.message
+          );
+        }
+      }
+
       return res.status(200).json({
         success: true,
         data: {
           id: orderDetails.id,
+          customerId: orderDetails.customerId,
           customerName: orderDetails.customerName,
           orderDate: orderDetails.date,
           totalQuantity: orderDetails.quantity,
@@ -988,6 +1032,8 @@ class OrderController {
           deliveryDate: orderDetails.deliveryDate,
           status: orderDetails.status,
           billingStatus: orderDetails.billingStatus || "pending",
+          gpNo: orderDetails.gpNo,
+          invoiceNo: orderDetails.invoiceNo,
           notes: orderDetails.notes,
           records: orderDetails.records.map((record) => ({
             id: record.id,
@@ -1006,6 +1052,114 @@ class OrderController {
     } catch (error) {
       console.error("Error getting order summary:", error);
       return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // GET /api/orders/invoice-preview/:customerId - Get next invoice number for a customer
+  static async getInvoicePreview(req, res) {
+    try {
+      const { customerId } = req.params;
+
+      if (!customerId || isNaN(parseInt(customerId))) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid customer ID is required",
+        });
+      }
+
+      // Get customer details
+      const [customer] = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerCode,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          incrementNumber: customers.incrementNumber,
+        })
+        .from(customers)
+        .where(eq(customers.id, parseInt(customerId)))
+        .limit(1);
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+      }
+
+      // Generate the next invoice number (without updating the counter)
+      const currentIncrement = customer.incrementNumber || 0;
+      const nextIncrement = currentIncrement + 1;
+      const nextInvoiceNo = `${customer.customerCode}${nextIncrement
+        .toString()
+        .padStart(3, "0")}`;
+
+      res.json({
+        success: true,
+        data: {
+          customerId: customer.id,
+          customerCode: customer.customerCode,
+          customerName: `${customer.firstName} ${customer.lastName}`,
+          currentIncrement: currentIncrement,
+          nextIncrement: nextIncrement,
+          nextInvoiceNo: nextInvoiceNo,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting invoice preview:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // POST /api/orders/generate-invoice-batch - Generate invoice number for multiple orders
+  static async generateInvoiceBatch(req, res) {
+    try {
+      const { orderIds } = req.body;
+
+      if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Order IDs array is required",
+        });
+      }
+
+      // Validate that all order IDs are valid numbers
+      const validOrderIds = orderIds
+        .filter((id) => !isNaN(parseInt(id)))
+        .map((id) => parseInt(id));
+
+      if (validOrderIds.length !== orderIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "All order IDs must be valid numbers",
+        });
+      }
+
+      // Generate invoice number for all orders
+      const invoiceNo = await Order.generateInvoiceNumberForMultipleOrders(
+        validOrderIds
+      );
+
+      res.json({
+        success: true,
+        message: "Invoice number generated successfully",
+        data: {
+          invoiceNo: invoiceNo,
+          orderIds: validOrderIds,
+          count: validOrderIds.length,
+        },
+      });
+    } catch (error) {
+      console.error("Error generating batch invoice:", error);
+      res.status(500).json({
         success: false,
         message: "Internal server error",
         error: error.message,

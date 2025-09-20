@@ -10,6 +10,7 @@ const {
   gte,
   lte,
   sql,
+  inArray,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
 const { orders, orderRecords, customers, items } = require("../db/schema");
@@ -63,6 +64,8 @@ class Order {
           billingStatus: orders.billingStatus,
           amount: orders.amount,
           isPaid: orders.isPaid,
+          gpNo: orders.gpNo,
+          invoiceNo: orders.invoiceNo,
           createdAt: orders.createdAt,
           updatedAt: orders.updatedAt,
         })
@@ -113,6 +116,7 @@ class Order {
         customerId = null,
         customerName = null,
         orderId = null,
+        excludeDelivered = false,
         sortBy = "createdAt",
         sortOrder = "desc",
       } = options;
@@ -139,6 +143,11 @@ class Order {
 
       if (orderId) {
         conditions.push(eq(orders.id, orderId));
+      }
+
+      // Exclude delivered orders if requested
+      if (excludeDelivered) {
+        conditions.push(sql`${orders.status} != 'Delivered'`);
       }
 
       // Handle customer name filtering
@@ -171,6 +180,8 @@ class Order {
             billingStatus: orders.billingStatus,
             amount: orders.amount,
             isPaid: orders.isPaid,
+            gpNo: orders.gpNo,
+            invoiceNo: orders.invoiceNo,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
           })
@@ -219,6 +230,8 @@ class Order {
             billingStatus: orders.billingStatus,
             amount: orders.amount,
             isPaid: orders.isPaid,
+            gpNo: orders.gpNo,
+            invoiceNo: orders.invoiceNo,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
           })
@@ -256,6 +269,7 @@ class Order {
         customerId = null,
         customerName = null,
         orderId = null,
+        excludeDelivered = false,
       } = options;
 
       const conditions = [];
@@ -279,6 +293,11 @@ class Order {
 
       if (orderId) {
         conditions.push(eq(orders.id, orderId));
+      }
+
+      // Exclude delivered orders if requested
+      if (excludeDelivered) {
+        conditions.push(sql`${orders.status} != 'Delivered'`);
       }
 
       const whereClause =
@@ -412,13 +431,158 @@ class Order {
     }
   }
 
+  // Generate invoice number based on customer code (counter-based approach)
+  static async generateInvoiceNumber(customerId) {
+    try {
+      // Get customer code and current increment number
+      const [customer] = await db
+        .select({
+          customerCode: customers.customerCode,
+          incrementNumber: customers.incrementNumber,
+        })
+        .from(customers)
+        .where(eq(customers.id, parseInt(customerId)))
+        .limit(1);
+
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+
+      const customerCode = customer.customerCode;
+      const currentIncrement = customer.incrementNumber || 0;
+      const nextIncrement = currentIncrement + 1;
+
+      // Generate invoice number
+      const invoiceNo = `${customerCode}${nextIncrement
+        .toString()
+        .padStart(3, "0")}`;
+
+      return invoiceNo;
+    } catch (error) {
+      console.error("Error generating invoice number:", error);
+      throw error;
+    }
+  }
+
+  // Update customer increment number when invoice is created
+  static async updateCustomerIncrementNumber(customerId) {
+    try {
+      await db
+        .update(customers)
+        .set({
+          incrementNumber: sql`${customers.incrementNumber} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, parseInt(customerId)));
+
+      return true;
+    } catch (error) {
+      console.error("Error updating customer increment number:", error);
+      throw error;
+    }
+  }
+
+  // Generate invoice number for existing orders that don't have one (counter-based approach)
+  static async generateInvoiceNumberForExistingOrder(orderId) {
+    try {
+      // Get the order
+      const order = await this.findById(orderId);
+      if (!order) {
+        throw new Error("Order not found");
+      }
+
+      // If order already has an invoice number, return it
+      if (order.invoiceNo) {
+        return order.invoiceNo;
+      }
+
+      // Generate new invoice number
+      const invoiceNo = await this.generateInvoiceNumber(order.customerId);
+
+      // Update the order with the new invoice number
+      await db
+        .update(orders)
+        .set({
+          invoiceNo: invoiceNo,
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, orderId));
+
+      return invoiceNo;
+    } catch (error) {
+      console.error(
+        "Error generating invoice number for existing order:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  // Generate invoice number for multiple orders (batch operation)
+  static async generateInvoiceNumberForMultipleOrders(orderIds) {
+    try {
+      if (!orderIds || orderIds.length === 0) {
+        throw new Error("Order IDs are required");
+      }
+
+      // Get the first order to determine customer
+      const [firstOrder] = await db
+        .select({
+          customerId: orders.customerId,
+        })
+        .from(orders)
+        .where(eq(orders.id, orderIds[0]))
+        .limit(1);
+
+      if (!firstOrder) {
+        throw new Error("First order not found");
+      }
+
+      // Generate a single invoice number for all orders
+      const invoiceNo = await this.generateInvoiceNumber(firstOrder.customerId);
+
+      // Update all orders with the same invoice number
+      await db
+        .update(orders)
+        .set({
+          invoiceNo: invoiceNo,
+          updatedAt: new Date(),
+        })
+        .where(inArray(orders.id, orderIds));
+
+      return invoiceNo;
+    } catch (error) {
+      console.error(
+        "Error generating invoice number for multiple orders:",
+        error
+      );
+      throw error;
+    }
+  }
+
   // Helper methods
   static async getCustomerName(customerId) {
     try {
-      // Implement customer lookup by customerId
-      // For now, return placeholder
+      // Get customer name from customers table
+      const [customer] = await db
+        .select({
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+        })
+        .from(customers)
+        .where(eq(customers.id, parseInt(customerId)))
+        .limit(1);
+
+      if (customer) {
+        return `${customer.firstName} ${customer.lastName}`;
+      }
+
       return `Customer ${customerId}`;
     } catch (error) {
+      console.error(
+        `Error fetching customer name for customerId: ${customerId}`,
+        error
+      );
       return `Customer ${customerId}`;
     }
   }

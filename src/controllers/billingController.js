@@ -7,6 +7,7 @@ const {
   invoiceRecords,
   orderPricingHistory,
   orderRecordPricingHistory,
+  items,
 } = require("../db/schema");
 const {
   eq,
@@ -273,6 +274,10 @@ class BillingController {
         })
         .where(inArray(orders.id, orderIds));
 
+      // Update customer increment number (only when invoice is actually created)
+      const Order = require("../models/Order");
+      await Order.updateCustomerIncrementNumber(firstOrder.customerId);
+
       // Get order details for response
       const orderDetails = await db
         .select({
@@ -431,6 +436,36 @@ class BillingController {
         .from(orderRecords)
         .where(eq(orderRecords.orderId, parseInt(orderId)));
 
+      // Get item codes for each record
+      const recordsWithItemCodes = await Promise.all(
+        records.map(async (record) => {
+          let itemCode = null;
+          if (record.itemId) {
+            try {
+              const [item] = await db
+                .select({ code: items.code })
+                .from(items)
+                .where(eq(items.id, record.itemId))
+                .limit(1);
+              itemCode = item?.code || null;
+            } catch (error) {
+              console.log(
+                `Could not fetch item code for itemId: ${record.itemId}`
+              );
+            }
+          }
+
+          return {
+            recordId: record.id,
+            itemCode: itemCode,
+            quantity: record.quantity,
+            unitPrice: parseFloat(record.unitPrice) || 0,
+            totalPrice: parseFloat(record.totalPrice) || 0,
+            lastUpdated: record.updatedAt,
+          };
+        })
+      );
+
       // Get pricing history
       const pricingHistory = await db
         .select()
@@ -445,14 +480,7 @@ class BillingController {
           currentPricing: {
             totalPrice: parseFloat(order.amount) || 0,
             lastUpdated: order.updatedAt,
-            records: records.map((record) => ({
-              recordId: record.id,
-              itemName: `Item ${record.itemId}`, // You may want to join with items table
-              quantity: record.quantity,
-              unitPrice: parseFloat(record.unitPrice) || 0,
-              totalPrice: parseFloat(record.totalPrice) || 0,
-              lastUpdated: record.updatedAt,
-            })),
+            records: recordsWithItemCodes,
           },
           pricingHistory: pricingHistory.map((history) => ({
             id: history.id,
@@ -509,6 +537,21 @@ class BillingController {
       // Calculate new total price
       const newTotalPrice = parseFloat(unitPrice) * record.quantity;
 
+      // Get item code
+      let itemCode = null;
+      if (record.itemId) {
+        try {
+          const [item] = await db
+            .select({ code: items.code })
+            .from(items)
+            .where(eq(items.id, record.itemId))
+            .limit(1);
+          itemCode = item?.code || null;
+        } catch (error) {
+          console.log(`Could not fetch item code for itemId: ${record.itemId}`);
+        }
+      }
+
       // Update record pricing
       await db
         .update(orderRecords)
@@ -535,7 +578,7 @@ class BillingController {
         data: {
           recordId: parseInt(recordId),
           orderId: parseInt(orderId),
-          itemName: `Item ${record.itemId}`,
+          itemCode: itemCode,
           quantity: record.quantity,
           unitPrice: parseFloat(unitPrice),
           totalPrice: newTotalPrice,
@@ -698,14 +741,37 @@ class BillingController {
             .from(orderRecords)
             .where(eq(orderRecords.orderId, order.id));
 
+          // Get item codes for each record
+          const recordsWithItemCodes = await Promise.all(
+            records.map(async (record) => {
+              let itemCode = null;
+              if (record.itemId) {
+                try {
+                  const [item] = await db
+                    .select({ code: items.code })
+                    .from(items)
+                    .where(eq(items.id, record.itemId))
+                    .limit(1);
+                  itemCode = item?.code || null;
+                } catch (error) {
+                  console.log(
+                    `Could not fetch item code for itemId: ${record.itemId}`
+                  );
+                }
+              }
+
+              return {
+                ...record,
+                itemCode: itemCode,
+                unitPrice: parseFloat(record.unitPrice),
+                totalPrice: parseFloat(record.totalPrice),
+              };
+            })
+          );
+
           return {
             ...order,
-            records: records.map((record) => ({
-              ...record,
-              itemName: `Item ${record.itemId}`,
-              unitPrice: parseFloat(record.unitPrice),
-              totalPrice: parseFloat(record.totalPrice),
-            })),
+            records: recordsWithItemCodes,
           };
         })
       );
