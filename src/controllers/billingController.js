@@ -1298,85 +1298,59 @@ class BillingController {
   // 6. GET /api/billing/income - Get income analytics with time range
   static async getIncomeAnalytics(req, res) {
     try {
-      const {
-        startDate,
-        endDate,
-        period = "month", // day, week, month, year
-        groupBy = "day", // day, week, month, year
-      } = req.query;
+      const { startDate, endDate } = req.query;
 
-      // Default to last 30 days if no dates provided
-      const defaultEndDate = new Date();
-      const defaultStartDate = new Date();
-      defaultStartDate.setDate(defaultStartDate.getDate() - 30);
+      // Validate required date parameters
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required",
+        });
+      }
 
-      const start = startDate ? new Date(startDate) : defaultStartDate;
-      const end = endDate ? new Date(endDate) : defaultEndDate;
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      // Extend end date by 1 day to include the full end date
+      end.setDate(end.getDate() + 1);
 
-      // Get total income (paid invoices)
+      // Get total revenue from invoice_records within date range
+      const [totalRevenueResult] = await db
+        .select({
+          totalRevenue: sum(invoiceRecords.totalPrice),
+          recordCount: count(),
+        })
+        .from(invoiceRecords)
+        .where(between(invoiceRecords.createdAt, start, end));
+
+      // Get total income (records from orders with "paid" billing_status)
       const [totalIncomeResult] = await db
         .select({
-          totalIncome: sum(invoices.total),
-          invoiceCount: count(),
+          totalIncome: sum(invoiceRecords.totalPrice),
+          recordCount: count(),
         })
-        .from(invoices)
+        .from(invoiceRecords)
+        .leftJoin(orders, eq(invoiceRecords.orderId, orders.id))
         .where(
           and(
-            eq(invoices.status, "paid"),
-            between(invoices.paymentDate, start, end)
+            eq(orders.billingStatus, "paid"),
+            between(invoiceRecords.createdAt, start, end)
           )
         );
 
-      // Get pending income (sent invoices not yet paid)
+      // Get pending income (records from orders with "invoiced" billing_status)
       const [pendingIncomeResult] = await db
         .select({
-          pendingIncome: sum(invoices.total),
-          pendingCount: count(),
+          pendingIncome: sum(invoiceRecords.totalPrice),
+          recordCount: count(),
         })
-        .from(invoices)
+        .from(invoiceRecords)
+        .leftJoin(orders, eq(invoiceRecords.orderId, orders.id))
         .where(
           and(
-            eq(invoices.status, "sent"),
-            between(invoices.createdAt, start, end)
+            eq(orders.billingStatus, "invoiced"),
+            between(invoiceRecords.createdAt, start, end)
           )
         );
-
-      // Get overdue income
-      const [overdueIncomeResult] = await db
-        .select({
-          overdueIncome: sum(invoices.total),
-          overdueCount: count(),
-        })
-        .from(invoices)
-        .where(
-          and(eq(invoices.status, "overdue"), lte(invoices.dueDate, new Date()))
-        );
-
-      // Get income by time period
-      const incomeByPeriod = await BillingController.getIncomeByPeriod(
-        start,
-        end,
-        groupBy
-      );
-
-      // Get top customers by income
-      const topCustomers = await db
-        .select({
-          customerId: invoices.customerId,
-          customerName: invoices.customerName,
-          totalPaid: sum(invoices.total),
-          invoiceCount: count(),
-        })
-        .from(invoices)
-        .where(
-          and(
-            eq(invoices.status, "paid"),
-            between(invoices.paymentDate, start, end)
-          )
-        )
-        .groupBy(invoices.customerId, invoices.customerName)
-        .orderBy(desc(sum(invoices.total)))
-        .limit(10);
 
       res.json({
         success: true,
@@ -1384,23 +1358,15 @@ class BillingController {
           period: {
             startDate: start.toISOString().split("T")[0],
             endDate: end.toISOString().split("T")[0],
-            groupBy,
           },
           summary: {
-            totalIncome: parseFloat(totalIncomeResult.totalIncome || 0),
-            totalInvoices: totalIncomeResult.invoiceCount || 0,
-            pendingIncome: parseFloat(pendingIncomeResult.pendingIncome || 0),
-            pendingInvoices: pendingIncomeResult.pendingCount || 0,
-            overdueIncome: parseFloat(overdueIncomeResult.overdueIncome || 0),
-            overdueInvoices: overdueIncomeResult.overdueCount || 0,
+            totalRevenue: parseFloat(totalRevenueResult.totalRevenue) || 0,
+            totalIncome: parseFloat(totalIncomeResult.totalIncome) || 0,
+            pendingIncome: parseFloat(pendingIncomeResult.pendingIncome) || 0,
+            totalRecords: totalRevenueResult.recordCount || 0,
+            paidRecords: totalIncomeResult.recordCount || 0,
+            invoicedRecords: pendingIncomeResult.recordCount || 0,
           },
-          incomeByPeriod,
-          topCustomers: topCustomers.map((customer) => ({
-            customerId: customer.customerId,
-            customerName: customer.customerName,
-            totalPaid: parseFloat(customer.totalPaid),
-            invoiceCount: customer.invoiceCount,
-          })),
         },
       });
     } catch (error) {
@@ -1605,6 +1571,67 @@ class BillingController {
       });
     } catch (error) {
       console.error("Error getting income trends:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // 9. GET /api/billing/top-customers - Get top customers by revenue
+  static async getTopCustomers(req, res) {
+    try {
+      const { startDate, endDate, limit = 5 } = req.query;
+
+      // Validate required date parameters
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate and endDate are required",
+        });
+      }
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      // Extend end date by 1 day to include the full end date
+      end.setDate(end.getDate() + 1);
+
+      // Get top customers by total paid amount from invoice_records using pool
+      const { pool } = require("../config/db");
+      const topCustomersResult = await pool.query(
+        `
+        SELECT 
+          c.id as customer_id,
+          c.first_name,
+          c.last_name,
+          SUM(ir.total_price) as total_paid,
+          COUNT(ir.id) as invoice_count
+        FROM invoice_records ir
+        INNER JOIN orders o ON ir.order_id = o.id
+        INNER JOIN customers c ON o.customer_id = c.id::text
+        WHERE ir.created_at BETWEEN $1 AND $2
+          AND o.billing_status = 'paid'
+        GROUP BY c.id, c.first_name, c.last_name
+        ORDER BY SUM(ir.total_price) DESC
+        LIMIT $3
+      `,
+        [start, end, parseInt(limit)]
+      );
+
+      const topCustomers = topCustomersResult.rows;
+
+      res.json({
+        success: true,
+        data: topCustomers.map((customer) => ({
+          customerId: customer.customer_id.toString(),
+          customerName: `${customer.first_name} ${customer.last_name}`,
+          totalPaid: parseFloat(customer.total_paid) || 0,
+          invoiceCount: customer.invoice_count || 0,
+        })),
+      });
+    } catch (error) {
+      console.error("Error getting top customers:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
