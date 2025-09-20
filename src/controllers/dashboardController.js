@@ -4,6 +4,7 @@ const {
   orderRecords,
   customers,
   machineAssignments,
+  invoiceRecords,
 } = require("../db/schema");
 const {
   eq,
@@ -430,16 +431,17 @@ class DashboardController {
   // Helper method to get daily orders data
   static async getDailyOrdersData(start, end) {
     try {
+      // Get daily orders count with revenue from invoice_records
       const dailyData = await db
         .select({
           date: sql`DATE(${orders.date})`.as("date"),
           orders: count(),
-          revenue:
-            sql`SUM(COALESCE(${orders.amount}, ${orders.quantity} * 100))`.as(
-              "revenue"
-            ), // Use actual amount or fallback calculation
+          revenue: sql`COALESCE(SUM(${invoiceRecords.totalPrice}), 0)`.as(
+            "revenue"
+          ),
         })
         .from(orders)
+        .leftJoin(invoiceRecords, eq(orders.id, invoiceRecords.orderId))
         .where(between(orders.date, start, end))
         .groupBy(sql`DATE(${orders.date})`)
         .orderBy(sql`DATE(${orders.date})`);
@@ -447,7 +449,7 @@ class DashboardController {
       return dailyData.map((item) => ({
         date: item.date, // Already in YYYY-MM-DD format from SQL DATE() function
         orders: parseInt(item.orders),
-        revenue: 0, // No pricing data available
+        revenue: parseFloat(item.revenue) || 0,
       }));
     } catch (error) {
       console.error("Error getting daily orders data:", error);

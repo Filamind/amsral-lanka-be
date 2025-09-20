@@ -221,23 +221,34 @@ class OrderController {
       const totalPages = Math.ceil(totalRecords / parseInt(limit));
 
       // Format orders for response
-      const formattedOrders = orders.map((order) => ({
-        id: order.id,
-        date: order.date,
-        referenceNo: order.referenceNo,
-        customerId: order.customerId,
-        customerName: order.customerName,
-        quantity: order.quantity,
-        notes: order.notes,
-        deliveryDate: order.deliveryDate,
-        status: order.status,
-        billingStatus: order.billingStatus || "pending",
-        recordsCount: order.recordsCount || 0,
-        complete: order.complete || false,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        records: [],
-      }));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+
+      const formattedOrders = orders.map((order) => {
+        // Check if delivery date is overdue
+        const deliveryDate = new Date(order.deliveryDate);
+        deliveryDate.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+        const isOverdue = deliveryDate < today && order.status !== "Delivered";
+
+        return {
+          id: order.id,
+          date: order.date,
+          referenceNo: order.referenceNo,
+          customerId: order.customerId,
+          customerName: order.customerName,
+          quantity: order.quantity,
+          notes: order.notes,
+          deliveryDate: order.deliveryDate,
+          status: order.status,
+          billingStatus: order.billingStatus || "pending",
+          recordsCount: order.recordsCount || 0,
+          complete: order.complete || false,
+          overdue: isOverdue,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          records: [],
+        };
+      });
       res.json({
         success: true,
         data: {

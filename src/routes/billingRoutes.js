@@ -78,4 +78,7 @@ router.get("/income/summary", BillingController.getIncomeSummary);
 // 19. Get Income Trends
 router.get("/income/trends", BillingController.getIncomeTrends);
 
+// 20. Get Top Customers
+router.get("/top-customers", BillingController.getTopCustomers);
+
 module.exports = router;
