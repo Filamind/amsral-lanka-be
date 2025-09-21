@@ -1,5 +1,7 @@
 const DryingType = require("../models/DryingType");
 
+// Controller for managing drying types
+
 class DryingTypeController {
   // GET /api/drying-types - Get all drying types with pagination
   static async getDryingTypes(req, res) {
