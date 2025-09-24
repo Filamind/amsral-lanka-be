@@ -546,11 +546,12 @@ class OrderController {
         records = [],
       } = req.body;
 
-      // Validatione ta
+      // Validation
       const errors = {};
 
       if (!date) errors.date = "Date is required";
       if (!customerId) errors.customerId = "Customer is required";
+      if (!itemId) errors.itemId = "Item is required";
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!deliveryDate) errors.deliveryDate = "Delivery date is required";
@@ -596,21 +597,19 @@ class OrderController {
 
       // Start transaction
       const result = await db.transaction(async (tx) => {
-        // Generate invoice number
-        const invoiceNo = await Order.generateInvoiceNumber(customerId);
-
         // Create order
         const orderData = {
           date: new Date(date),
           customerId,
+          itemId,
           quantity: parseInt(quantity),
           notes,
           deliveryDate: new Date(deliveryDate),
-          status: "Pending",
           gpNo: gpNo || null,
-          invoiceNo: invoiceNo,
+          status: "Pending",
         };
 
+        console.log("📝 TABLE UPDATE: orders");
         const order = await Order.create(orderData);
 
         // Create records (only if records array is not empty)
@@ -618,11 +617,13 @@ class OrderController {
         if (records && records.length > 0) {
           const recordsData = records.map((record) => ({
             orderId: order.id,
+            itemId: itemId, // Use the same itemId as the order
             quantity: parseInt(record.quantity),
             washType: record.washType,
             processTypes: record.processTypes,
           }));
 
+          console.log("📝 TABLE UPDATE: order_records");
           createdRecords = await OrderRecord.bulkCreate(recordsData);
         }
 
@@ -841,15 +842,51 @@ class OrderController {
         });
       }
 
-      // Delete order (cascade delete will handle records)
-      await Order.delete(id);
+      // Delete order and all related records
+      const result = await Order.deleteWithRelatedRecords(id);
 
       res.json({
         success: true,
         message: "Order and all associated records deleted successfully",
+        data: {
+          deletedOrderId: id,
+          deletedRecords: result,
+        },
       });
     } catch (error) {
       console.error("Error deleting order:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // DELETE /api/orders - Delete all orders (for testing purposes)
+  static async deleteAllOrders(req, res) {
+    try {
+      // Check if this is a test environment or has proper authorization
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({
+          success: false,
+          message: "Delete all orders is not allowed in production environment",
+        });
+      }
+
+      // Delete all orders and related records
+      const result = await Order.deleteAllWithRelatedRecords();
+
+      res.json({
+        success: true,
+        message: "All orders and associated records deleted successfully",
+        data: {
+          deletedOrdersCount: result.ordersCount,
+          deletedRecords: result.recordsCount,
+        },
+      });
+    } catch (error) {
+      console.error("Error deleting all orders:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

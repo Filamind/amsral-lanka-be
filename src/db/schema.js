@@ -159,21 +159,22 @@ const orders = pgTable(
     date: date("date").notNull(),
     referenceNo: varchar("reference_no", { length: 50 }).unique().notNull(),
     customerId: varchar("customer_id", { length: 50 }).notNull(),
+    itemId: varchar("item_id", { length: 50 }).notNull(),
     quantity: integer("quantity").notNull(),
     notes: text("notes"),
     deliveryDate: date("delivery_date").notNull(),
     status: varchar("status", { length: 20 }).default("Pending"),
     billingStatus: varchar("billing_status", { length: 20 }).default("pending"), // "pending", "invoiced", "paid"
     amount: decimal("amount", { precision: 10, scale: 2 }).default("0.00"),
-    isPaid: boolean("is_paid").default(false),
     gpNo: varchar("gp_no", { length: 100 }), // GP Number - optional
-    invoiceNo: varchar("invoice_no", { length: 100 }), // Invoice Number - generated
+    invoiceNo: varchar("invoice_no", { length: 100 }), // Invoice Number - assigned when invoice is created
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
     referenceNoIdx: index("idx_reference_no").on(table.referenceNo),
     customerIdIdx: index("idx_customer_id").on(table.customerId),
+    itemIdIdx: index("idx_item_id").on(table.itemId),
     statusIdx: index("idx_status").on(table.status),
     billingStatusIdx: index("idx_billing_status").on(table.billingStatus),
     dateIdx: index("idx_date").on(table.date),

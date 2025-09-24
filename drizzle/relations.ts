@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { roles, users, orderRecords, machineAssignments, orders, employees } from "./schema";
+import { roles, users, orderRecords, machineAssignments, orders, employees, invoices, invoiceRecords } from "./schema";
 
 export const usersRelations = relations(users, ({one}) => ({
 	role: one(roles, {
@@ -42,4 +42,15 @@ export const ordersRelations = relations(orders, ({many}) => ({
 
 export const employeesRelations = relations(employees, ({many}) => ({
 	machineAssignments: many(machineAssignments),
+}));
+
+export const invoiceRecordsRelations = relations(invoiceRecords, ({one}) => ({
+	invoice: one(invoices, {
+		fields: [invoiceRecords.invoiceId],
+		references: [invoices.id]
+	}),
+}));
+
+export const invoicesRelations = relations(invoices, ({many}) => ({
+	invoiceRecords: many(invoiceRecords),
 }));

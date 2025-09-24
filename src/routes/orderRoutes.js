@@ -50,4 +50,7 @@ router.put("/:id", OrderController.updateOrder);
 // DELETE /api/orders/:id - Delete order
 router.delete("/:id", OrderController.deleteOrder);
 
+// DELETE /api/orders - Delete all orders (for testing purposes)
+router.delete("/", OrderController.deleteAllOrders);
+
 module.exports = router;

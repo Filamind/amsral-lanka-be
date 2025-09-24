@@ -133,7 +133,6 @@ class BillingController {
           date: orders.date,
           quantity: orders.quantity,
           amount: orders.amount,
-          isPaid: orders.isPaid,
           status: orders.status,
           billingStatus: orders.billingStatus,
           createdAt: orders.createdAt,
@@ -229,6 +228,7 @@ class BillingController {
       }
 
       // Create invoice
+      console.log("📝 TABLE UPDATE: invoices");
       const [invoice] = await db
         .insert(invoices)
         .values({
@@ -253,6 +253,7 @@ class BillingController {
 
       // Create invoice records
       if (records && records.length > 0) {
+        console.log("📝 TABLE UPDATE: invoice_records");
         const invoiceRecordData = records.map((record) => ({
           invoiceId: invoice.id,
           orderId: record.orderId,
@@ -266,6 +267,7 @@ class BillingController {
       }
 
       // Update order billing statuses to "invoiced"
+      console.log("📝 TABLE UPDATE: orders (billing status)");
       await db
         .update(orders)
         .set({
@@ -872,7 +874,6 @@ class BillingController {
       await db
         .update(orders)
         .set({
-          isPaid: true,
           billingStatus: "paid",
           updatedAt: new Date(),
         })
@@ -1237,7 +1238,6 @@ class BillingController {
           referenceNo: orders.referenceNo,
           quantity: orders.quantity,
           amount: orders.amount,
-          isPaid: orders.isPaid,
           status: orders.status,
           billingStatus: orders.billingStatus,
           date: orders.date,

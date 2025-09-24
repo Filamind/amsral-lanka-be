@@ -109,6 +109,7 @@ class MachineAssignmentController {
         dryingMachine,
       };
 
+      console.log("📝 TABLE UPDATE: machine_assignments");
       const assignment = await MachineAssignment.create(assignmentData);
 
       res.status(201).json({
@@ -188,6 +189,7 @@ class MachineAssignmentController {
       if (dryingMachine !== undefined) updateData.dryingMachine = dryingMachine;
       if (status !== undefined) updateData.status = status;
 
+      console.log("📝 TABLE UPDATE: machine_assignments");
       const assignment = await MachineAssignment.update(
         assignmentId,
         updateData
