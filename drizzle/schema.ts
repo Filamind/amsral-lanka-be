@@ -146,6 +146,7 @@ export const machineAssignments = pgTable("machine_assignments", {
 	orderId: integer("order_id").notNull(),
 	assignedById: integer("assigned_by_id"),
 	quantity: integer().notNull(),
+	returnQuantity: integer("return_quantity"),
 	washingMachine: varchar("washing_machine", { length: 50 }),
 	dryingMachine: varchar("drying_machine", { length: 50 }),
 	assignedAt: timestamp("assigned_at", { withTimezone: true, mode: 'string' }).defaultNow(),

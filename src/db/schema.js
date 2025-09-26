@@ -234,6 +234,7 @@ const machineAssignments = pgTable(
       onDelete: "set null",
     }),
     quantity: integer("quantity").notNull(),
+    returnQuantity: integer("return_quantity"),
     washingMachine: varchar("washing_machine", { length: 50 }),
     dryingMachine: varchar("drying_machine", { length: 50 }),
     trackingNumber: varchar("tracking_number", { length: 20 }),

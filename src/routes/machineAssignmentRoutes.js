@@ -15,6 +15,12 @@ router.post(
   MachineAssignmentController.createAssignment
 );
 
+// PUT /api/records/:recordId/assignments/:assignmentId/completion - Update assignment completion status
+router.put(
+  "/:recordId/assignments/:assignmentId/completion",
+  MachineAssignmentController.completeAssignment
+);
+
 // PUT /api/records/:recordId/assignments/:assignmentId - Update machine assignment
 router.put(
   "/:recordId/assignments/:assignmentId",
@@ -25,12 +31,6 @@ router.put(
 router.delete(
   "/:recordId/assignments/:assignmentId",
   MachineAssignmentController.deleteAssignment
-);
-
-// PUT /api/records/:recordId/assignments/:assignmentId/complete - Mark assignment as completed
-router.put(
-  "/:recordId/assignments/:assignmentId/complete",
-  MachineAssignmentController.completeAssignment
 );
 
 // GET /api/records/:recordId/assignments/stats - Get assignment statistics

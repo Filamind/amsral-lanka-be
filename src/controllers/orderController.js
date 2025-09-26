@@ -123,11 +123,10 @@ class OrderController {
   static async addOrderRecord(req, res) {
     try {
       const { orderId } = req.params;
-      const { itemId, quantity, washType, processTypes } = req.body;
+      const { quantity, washType, processTypes } = req.body;
 
       // Basic validation
       const errors = {};
-      if (!itemId) errors.itemId = "Item ID is required";
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!washType) errors.washType = "Wash type is required";
@@ -144,7 +143,7 @@ class OrderController {
           .json({ success: false, message: "Validation failed", errors });
       }
 
-      // Check if order exists
+      // Check if order exists and get itemId from order
       const order = await Order.findById(orderId);
       if (!order) {
         return res
@@ -152,15 +151,16 @@ class OrderController {
           .json({ success: false, message: "Order not found" });
       }
 
-      // Create record
+      // Create record using itemId from order
       const recordData = {
         orderId: parseInt(orderId),
-        itemId,
+        itemId: order.itemId, // Fetch itemId from order table
         quantity: parseInt(quantity),
         washType,
         processTypes,
       };
       try {
+        console.log("📝 TABLE UPDATE: order_records");
         const record = await OrderRecord.create(recordData);
         res.status(201).json({
           success: true,

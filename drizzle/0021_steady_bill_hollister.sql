@@ -1,0 +1,1 @@
+ALTER TABLE "machine_assignments" ADD COLUMN "return_quantity" integer;
