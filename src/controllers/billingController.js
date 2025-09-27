@@ -321,6 +321,56 @@ class BillingController {
         })
         .where(inArray(orders.id, orderIds));
 
+      // Mark previous invoices for this customer as "paid" and update their orders' billing status
+      console.log(
+        "📝 TABLE UPDATE: previous invoices and orders (marking as paid)"
+      );
+
+      // Get all previous invoices for this customer (excluding the current one)
+      const previousInvoices = await db
+        .select({ id: invoices.id, orderIds: invoices.orderIds })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.customerId, firstOrder.customerId),
+            sql`${invoices.id} != ${invoice.id}`,
+            sql`${invoices.status} != 'paid'`
+          )
+        );
+
+      if (previousInvoices.length > 0) {
+        // Update previous invoices to "paid" status
+        const previousInvoiceIds = previousInvoices.map((inv) => inv.id);
+        await db
+          .update(invoices)
+          .set({
+            status: "paid",
+            updatedAt: new Date(),
+          })
+          .where(inArray(invoices.id, previousInvoiceIds));
+
+        // Get all order IDs from previous invoices
+        const allPreviousOrderIds = [];
+        for (const prevInvoice of previousInvoices) {
+          const orderIds =
+            typeof prevInvoice.orderIds === "string"
+              ? JSON.parse(prevInvoice.orderIds)
+              : prevInvoice.orderIds;
+          allPreviousOrderIds.push(...orderIds);
+        }
+
+        // Update billing status of orders from previous invoices to "paid"
+        if (allPreviousOrderIds.length > 0) {
+          await db
+            .update(orders)
+            .set({
+              billingStatus: "paid",
+              updatedAt: new Date(),
+            })
+            .where(inArray(orders.id, allPreviousOrderIds));
+        }
+      }
+
       // Update customer increment number (only when invoice is actually created)
       const Order = require("../models/Order");
       await Order.updateCustomerIncrementNumber(firstOrder.customerId);
@@ -1359,42 +1409,35 @@ class BillingController {
       // Extend end date by 1 day to include the full end date
       end.setDate(end.getDate() + 1);
 
-      // Get total revenue from invoice_records within date range
+      // Get total revenue from invoices within date range
       const [totalRevenueResult] = await db
         .select({
-          totalRevenue: sum(invoiceRecords.totalPrice),
+          totalRevenue: sum(invoices.total),
           recordCount: count(),
         })
-        .from(invoiceRecords)
-        .where(between(invoiceRecords.createdAt, start, end));
+        .from(invoices)
+        .where(between(invoices.createdAt, start, end));
 
-      // Get total income (records from orders with "paid" billing_status)
+      // Get total income (sum of payment field from invoices)
       const [totalIncomeResult] = await db
         .select({
-          totalIncome: sum(invoiceRecords.totalPrice),
+          totalIncome: sum(invoices.payment),
           recordCount: count(),
         })
-        .from(invoiceRecords)
-        .leftJoin(orders, eq(invoiceRecords.orderId, orders.id))
-        .where(
-          and(
-            eq(orders.billingStatus, "paid"),
-            between(invoiceRecords.createdAt, start, end)
-          )
-        );
+        .from(invoices)
+        .where(between(invoices.createdAt, start, end));
 
-      // Get pending income (records from orders with "invoiced" billing_status)
+      // Get pending income (invoices with status "draft" or "sent")
       const [pendingIncomeResult] = await db
         .select({
-          pendingIncome: sum(invoiceRecords.totalPrice),
+          pendingIncome: sum(invoices.total),
           recordCount: count(),
         })
-        .from(invoiceRecords)
-        .leftJoin(orders, eq(invoiceRecords.orderId, orders.id))
+        .from(invoices)
         .where(
           and(
-            eq(orders.billingStatus, "invoiced"),
-            between(invoiceRecords.createdAt, start, end)
+            or(eq(invoices.status, "draft"), eq(invoices.status, "sent")),
+            between(invoices.createdAt, start, end)
           )
         );
 
@@ -1448,16 +1491,11 @@ class BillingController {
     const incomeByPeriod = await db
       .select({
         period: dateFormat,
-        totalIncome: sum(invoices.total),
+        totalIncome: sum(invoices.payment),
         invoiceCount: count(),
       })
       .from(invoices)
-      .where(
-        and(
-          eq(invoices.status, "paid"),
-          between(invoices.paymentDate, startDate, endDate)
-        )
-      )
+      .where(between(invoices.createdAt, startDate, endDate))
       .groupBy(dateFormat)
       .orderBy(asc(dateFormat));
 
@@ -1497,16 +1535,11 @@ class BillingController {
       // Get current period income
       const [currentPeriodResult] = await db
         .select({
-          totalIncome: sum(invoices.total),
+          totalIncome: sum(invoices.payment),
           invoiceCount: count(),
         })
         .from(invoices)
-        .where(
-          and(
-            eq(invoices.status, "paid"),
-            between(invoices.paymentDate, startDate, endDate)
-          )
-        );
+        .where(between(invoices.createdAt, startDate, endDate));
 
       // Get previous period for comparison
       const previousStartDate = new Date(startDate);
@@ -1529,16 +1562,11 @@ class BillingController {
 
       const [previousPeriodResult] = await db
         .select({
-          totalIncome: sum(invoices.total),
+          totalIncome: sum(invoices.payment),
           invoiceCount: count(),
         })
         .from(invoices)
-        .where(
-          and(
-            eq(invoices.status, "paid"),
-            between(invoices.paymentDate, previousStartDate, previousEndDate)
-          )
-        );
+        .where(between(invoices.createdAt, previousStartDate, previousEndDate));
 
       const currentIncome = parseFloat(currentPeriodResult.totalIncome || 0);
       const previousIncome = parseFloat(previousPeriodResult.totalIncome || 0);
@@ -1643,7 +1671,7 @@ class BillingController {
       // Extend end date by 1 day to include the full end date
       end.setDate(end.getDate() + 1);
 
-      // Get top customers by total paid amount from invoice_records using pool
+      // Get top customers by total invoiced amount from invoices
       const { pool } = require("../config/db");
       const topCustomersResult = await pool.query(
         `
@@ -1651,15 +1679,13 @@ class BillingController {
           c.id as customer_id,
           c.first_name,
           c.last_name,
-          SUM(ir.total_price) as total_paid,
-          COUNT(ir.id) as invoice_count
-        FROM invoice_records ir
-        INNER JOIN orders o ON ir.order_id = o.id
-        INNER JOIN customers c ON o.customer_id = c.id::text
-        WHERE ir.created_at BETWEEN $1 AND $2
-          AND o.billing_status = 'paid'
+          SUM(i.total) as total_invoiced,
+          COUNT(i.id) as invoice_count
+        FROM invoices i
+        INNER JOIN customers c ON i.customer_id = c.id::text
+        WHERE i.created_at BETWEEN $1 AND $2
         GROUP BY c.id, c.first_name, c.last_name
-        ORDER BY SUM(ir.total_price) DESC
+        ORDER BY SUM(i.total) DESC
         LIMIT $3
       `,
         [start, end, parseInt(limit)]
@@ -1672,7 +1698,7 @@ class BillingController {
         data: topCustomers.map((customer) => ({
           customerId: customer.customer_id.toString(),
           customerName: `${customer.first_name} ${customer.last_name}`,
-          totalPaid: parseFloat(customer.total_paid) || 0,
+          totalInvoiced: parseFloat(customer.total_invoiced) || 0,
           invoiceCount: customer.invoice_count || 0,
         })),
       });
