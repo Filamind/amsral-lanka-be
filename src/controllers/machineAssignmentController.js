@@ -109,6 +109,7 @@ class MachineAssignmentController {
         dryingMachine,
       };
 
+      console.log("📝 TABLE UPDATE: machine_assignments");
       const assignment = await MachineAssignment.create(assignmentData);
 
       res.status(201).json({
@@ -188,6 +189,7 @@ class MachineAssignmentController {
       if (dryingMachine !== undefined) updateData.dryingMachine = dryingMachine;
       if (status !== undefined) updateData.status = status;
 
+      console.log("📝 TABLE UPDATE: machine_assignments");
       const assignment = await MachineAssignment.update(
         assignmentId,
         updateData
@@ -294,10 +296,31 @@ class MachineAssignmentController {
     }
   }
 
-  // PUT /api/records/:recordId/assignments/:assignmentId/complete - Mark assignment as completed
+  // PUT /api/records/:recordId/assignments/:assignmentId/completion - Update assignment completion status
   static async completeAssignment(req, res) {
     try {
       const { recordId, assignmentId } = req.params;
+      const { isCompleted, returnQuantity } = req.body;
+
+      // Basic validation
+      const errors = {};
+      if (typeof isCompleted !== "boolean") {
+        errors.isCompleted = "isCompleted must be a boolean";
+      }
+      if (
+        returnQuantity !== undefined &&
+        (typeof returnQuantity !== "number" || returnQuantity < 0)
+      ) {
+        errors.returnQuantity = "returnQuantity must be a non-negative number";
+      }
+
+      if (Object.keys(errors).length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors,
+        });
+      }
 
       // Check if assignment exists
       const existingAssignment = await MachineAssignment.findById(assignmentId);
@@ -316,22 +339,35 @@ class MachineAssignmentController {
         });
       }
 
-      // Update assignment status to completed
-      const assignment = await MachineAssignment.update(assignmentId, {
-        status: "Completed",
-      });
+      // Prepare update data
+      const updateData = {};
+      if (isCompleted !== undefined) {
+        updateData.status = isCompleted ? "Completed" : "In Progress";
+      }
+      if (returnQuantity !== undefined) {
+        updateData.returnQuantity = returnQuantity;
+      }
+
+      // Update assignment
+      console.log("📝 TABLE UPDATE: machine_assignments");
+      const assignment = await MachineAssignment.update(
+        assignmentId,
+        updateData
+      );
 
       // Update the record status based on assignment completion
-      const OrderRecord = require("../models/OrderRecord");
-      await OrderRecord.updateRecordStatus(recordId);
+      if (isCompleted !== undefined) {
+        const OrderRecord = require("../models/OrderRecord");
+        await OrderRecord.updateRecordStatus(recordId);
+      }
 
       res.json({
         success: true,
-        message: "Assignment marked as completed successfully",
+        message: "Assignment updated successfully",
         data: assignment,
       });
     } catch (error) {
-      console.error("Error completing assignment:", error);
+      console.error("Error updating assignment:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

@@ -187,10 +187,12 @@ class ProductionController {
         assignedAt: new Date().toISOString(),
       };
 
+      console.log("📝 TABLE UPDATE: customer_order_line_processes");
       const process = await CustomerOrderLineProcess.create(processData);
 
       // Update remaining quantity in order line
       const newRemainingQuantity = remainingQuantity - quantity;
+      console.log("📝 TABLE UPDATE: customer_order_lines (remaining quantity)");
       await CustomerOrderLine.updateRemainingQuantity(
         parseInt(customerOrderLineId),
         newRemainingQuantity
@@ -198,6 +200,7 @@ class ProductionController {
 
       // Mark as completed if remaining quantity is 0
       if (newRemainingQuantity === 0) {
+        console.log("📝 TABLE UPDATE: customer_order_lines (status)");
         await CustomerOrderLine.updateStatus(
           parseInt(customerOrderLineId),
           "completed"

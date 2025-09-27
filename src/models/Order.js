@@ -13,7 +13,17 @@ const {
   inArray,
 } = require("drizzle-orm");
 const { db } = require("../config/db");
-const { orders, orderRecords, customers, items } = require("../db/schema");
+const {
+  orders,
+  orderRecords,
+  customers,
+  items,
+  machineAssignments,
+  orderPricingHistory,
+  orderRecordPricingHistory,
+  invoices,
+  invoiceRecords,
+} = require("../db/schema");
 
 class Order {
   // Create a new order
@@ -57,13 +67,13 @@ class Order {
           date: orders.date,
           referenceNo: orders.referenceNo,
           customerId: orders.customerId,
+          itemId: orders.itemId,
           quantity: orders.quantity,
           notes: orders.notes,
           deliveryDate: orders.deliveryDate,
           status: orders.status,
           billingStatus: orders.billingStatus,
           amount: orders.amount,
-          isPaid: orders.isPaid,
           gpNo: orders.gpNo,
           invoiceNo: orders.invoiceNo,
           createdAt: orders.createdAt,
@@ -173,13 +183,13 @@ class Order {
             date: orders.date,
             referenceNo: orders.referenceNo,
             customerId: orders.customerId,
+            itemId: orders.itemId,
             quantity: orders.quantity,
             notes: orders.notes,
             deliveryDate: orders.deliveryDate,
             status: orders.status,
             billingStatus: orders.billingStatus,
             amount: orders.amount,
-            isPaid: orders.isPaid,
             gpNo: orders.gpNo,
             invoiceNo: orders.invoiceNo,
             createdAt: orders.createdAt,
@@ -223,13 +233,13 @@ class Order {
             date: orders.date,
             referenceNo: orders.referenceNo,
             customerId: orders.customerId,
+            itemId: orders.itemId,
             quantity: orders.quantity,
             notes: orders.notes,
             deliveryDate: orders.deliveryDate,
             status: orders.status,
             billingStatus: orders.billingStatus,
             amount: orders.amount,
-            isPaid: orders.isPaid,
             gpNo: orders.gpNo,
             invoiceNo: orders.invoiceNo,
             createdAt: orders.createdAt,
@@ -398,6 +408,136 @@ class Order {
       return order;
     } catch (error) {
       console.error("Error deleting order:", error);
+      throw error;
+    }
+  }
+
+  // Delete order with all related records (explicit cleanup)
+  static async deleteWithRelatedRecords(id) {
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Get counts before deletion for reporting
+        const [orderRecordsCount] = await tx
+          .select({ count: count() })
+          .from(orderRecords)
+          .where(eq(orderRecords.orderId, id));
+
+        const [machineAssignmentsCount] = await tx
+          .select({ count: count() })
+          .from(machineAssignments)
+          .where(eq(machineAssignments.orderId, id));
+
+        // Delete related records first (in case cascade doesn't work properly)
+        await tx.delete(orderRecords).where(eq(orderRecords.orderId, id));
+        await tx
+          .delete(machineAssignments)
+          .where(eq(machineAssignments.orderId, id));
+
+        // Delete pricing history
+        await tx
+          .delete(orderPricingHistory)
+          .where(eq(orderPricingHistory.orderId, id));
+        await tx
+          .delete(orderRecordPricingHistory)
+          .where(eq(orderRecordPricingHistory.orderId, id));
+
+        // Delete invoice records that reference this order
+        await tx.delete(invoiceRecords).where(eq(invoiceRecords.orderId, id));
+
+        // Find and delete invoices that contain this order ID in their orderIds JSON
+        const invoicesWithOrder = await tx
+          .select({ id: invoices.id, orderIds: invoices.orderIds })
+          .from(invoices);
+
+        for (const invoice of invoicesWithOrder) {
+          const orderIds = JSON.parse(invoice.orderIds);
+          if (orderIds.includes(parseInt(id))) {
+            // If this is the only order in the invoice, delete the entire invoice
+            if (orderIds.length === 1) {
+              await tx.delete(invoices).where(eq(invoices.id, invoice.id));
+            } else {
+              // Remove this order from the invoice's orderIds array
+              const updatedOrderIds = orderIds.filter(
+                (orderId) => orderId !== parseInt(id)
+              );
+              await tx
+                .update(invoices)
+                .set({ orderIds: JSON.stringify(updatedOrderIds) })
+                .where(eq(invoices.id, invoice.id));
+            }
+          }
+        }
+
+        // Delete the order itself
+        const [deletedOrder] = await tx
+          .delete(orders)
+          .where(eq(orders.id, id))
+          .returning();
+
+        return {
+          order: deletedOrder,
+          deletedOrderRecords: orderRecordsCount.count,
+          deletedMachineAssignments: machineAssignmentsCount.count,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Error deleting order with related records:", error);
+      throw error;
+    }
+  }
+
+  // Delete all orders with related records (for testing)
+  static async deleteAllWithRelatedRecords() {
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Get counts before deletion
+        const [ordersCount] = await tx.select({ count: count() }).from(orders);
+        const [orderRecordsCount] = await tx
+          .select({ count: count() })
+          .from(orderRecords);
+        const [machineAssignmentsCount] = await tx
+          .select({ count: count() })
+          .from(machineAssignments);
+        const [pricingHistoryCount] = await tx
+          .select({ count: count() })
+          .from(orderPricingHistory);
+        const [recordPricingHistoryCount] = await tx
+          .select({ count: count() })
+          .from(orderRecordPricingHistory);
+        const [invoicesCount] = await tx
+          .select({ count: count() })
+          .from(invoices);
+        const [invoiceRecordsCount] = await tx
+          .select({ count: count() })
+          .from(invoiceRecords);
+
+        // Delete all related records first
+        await tx.delete(orderRecords);
+        await tx.delete(machineAssignments);
+        await tx.delete(orderPricingHistory);
+        await tx.delete(orderRecordPricingHistory);
+        await tx.delete(invoiceRecords);
+        await tx.delete(invoices);
+
+        // Delete all orders
+        await tx.delete(orders);
+
+        return {
+          ordersCount: ordersCount.count,
+          orderRecordsCount: orderRecordsCount.count,
+          machineAssignmentsCount: machineAssignmentsCount.count,
+          pricingHistoryCount: pricingHistoryCount.count,
+          recordPricingHistoryCount: recordPricingHistoryCount.count,
+          invoicesCount: invoicesCount.count,
+          invoiceRecordsCount: invoiceRecordsCount.count,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Error deleting all orders with related records:", error);
       throw error;
     }
   }

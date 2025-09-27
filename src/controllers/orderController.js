@@ -123,11 +123,10 @@ class OrderController {
   static async addOrderRecord(req, res) {
     try {
       const { orderId } = req.params;
-      const { itemId, quantity, washType, processTypes } = req.body;
+      const { quantity, washType, processTypes } = req.body;
 
       // Basic validation
       const errors = {};
-      if (!itemId) errors.itemId = "Item ID is required";
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!washType) errors.washType = "Wash type is required";
@@ -144,7 +143,7 @@ class OrderController {
           .json({ success: false, message: "Validation failed", errors });
       }
 
-      // Check if order exists
+      // Check if order exists and get itemId from order
       const order = await Order.findById(orderId);
       if (!order) {
         return res
@@ -152,15 +151,16 @@ class OrderController {
           .json({ success: false, message: "Order not found" });
       }
 
-      // Create record
+      // Create record using itemId from order
       const recordData = {
         orderId: parseInt(orderId),
-        itemId,
+        itemId: order.itemId, // Fetch itemId from order table
         quantity: parseInt(quantity),
         washType,
         processTypes,
       };
       try {
+        console.log("📝 TABLE UPDATE: order_records");
         const record = await OrderRecord.create(recordData);
         res.status(201).json({
           success: true,
@@ -546,11 +546,12 @@ class OrderController {
         records = [],
       } = req.body;
 
-      // Validatione ta
+      // Validation
       const errors = {};
 
       if (!date) errors.date = "Date is required";
       if (!customerId) errors.customerId = "Customer is required";
+      if (!itemId) errors.itemId = "Item is required";
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!deliveryDate) errors.deliveryDate = "Delivery date is required";
@@ -596,21 +597,19 @@ class OrderController {
 
       // Start transaction
       const result = await db.transaction(async (tx) => {
-        // Generate invoice number
-        const invoiceNo = await Order.generateInvoiceNumber(customerId);
-
         // Create order
         const orderData = {
           date: new Date(date),
           customerId,
+          itemId,
           quantity: parseInt(quantity),
           notes,
           deliveryDate: new Date(deliveryDate),
-          status: "Pending",
           gpNo: gpNo || null,
-          invoiceNo: invoiceNo,
+          status: "Pending",
         };
 
+        console.log("📝 TABLE UPDATE: orders");
         const order = await Order.create(orderData);
 
         // Create records (only if records array is not empty)
@@ -618,11 +617,13 @@ class OrderController {
         if (records && records.length > 0) {
           const recordsData = records.map((record) => ({
             orderId: order.id,
+            itemId: itemId, // Use the same itemId as the order
             quantity: parseInt(record.quantity),
             washType: record.washType,
             processTypes: record.processTypes,
           }));
 
+          console.log("📝 TABLE UPDATE: order_records");
           createdRecords = await OrderRecord.bulkCreate(recordsData);
         }
 
@@ -841,15 +842,51 @@ class OrderController {
         });
       }
 
-      // Delete order (cascade delete will handle records)
-      await Order.delete(id);
+      // Delete order and all related records
+      const result = await Order.deleteWithRelatedRecords(id);
 
       res.json({
         success: true,
         message: "Order and all associated records deleted successfully",
+        data: {
+          deletedOrderId: id,
+          deletedRecords: result,
+        },
       });
     } catch (error) {
       console.error("Error deleting order:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // DELETE /api/orders - Delete all orders (for testing purposes)
+  static async deleteAllOrders(req, res) {
+    try {
+      // Check if this is a test environment or has proper authorization
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({
+          success: false,
+          message: "Delete all orders is not allowed in production environment",
+        });
+      }
+
+      // Delete all orders and related records
+      const result = await Order.deleteAllWithRelatedRecords();
+
+      res.json({
+        success: true,
+        message: "All orders and associated records deleted successfully",
+        data: {
+          deletedOrdersCount: result.ordersCount,
+          deletedRecords: result.recordsCount,
+        },
+      });
+    } catch (error) {
+      console.error("Error deleting all orders:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -1030,6 +1067,49 @@ class OrderController {
         }
       }
 
+      // Calculate total actual quantity from all records
+      const recordsWithActualQuantity = await Promise.all(
+        orderDetails.records.map(async (record) => {
+          const { machineAssignments } = require("../db/schema");
+
+          // Get all machine assignments for this record
+          const assignments = await db
+            .select({
+              returnQuantity: machineAssignments.returnQuantity,
+            })
+            .from(machineAssignments)
+            .where(eq(machineAssignments.recordId, record.id));
+
+          // Sum up the return quantities
+          const totalReturnQuantity = assignments.reduce((sum, assignment) => {
+            return (
+              sum +
+              (assignment.returnQuantity
+                ? parseFloat(assignment.returnQuantity)
+                : 0)
+            );
+          }, 0);
+
+          return totalReturnQuantity > 0
+            ? totalReturnQuantity
+            : record.quantity;
+        })
+      );
+
+      const totalActualQuantity = recordsWithActualQuantity.reduce(
+        (sum, qty) => sum + qty,
+        0
+      );
+
+      // Get customer balance
+      const [customer] = await db
+        .select({ balance: customers.balance })
+        .from(customers)
+        .where(eq(customers.id, parseInt(orderDetails.customerId)))
+        .limit(1);
+
+      const customerBalance = customer?.balance ? parseFloat(customer.balance) : 0;
+
       return res.status(200).json({
         success: true,
         data: {
@@ -1037,7 +1117,8 @@ class OrderController {
           customerId: orderDetails.customerId,
           customerName: orderDetails.customerName,
           orderDate: orderDetails.date,
-          totalQuantity: orderDetails.quantity,
+          totalQuantity: totalActualQuantity, // Use actual total quantity
+          originalTotalQuantity: orderDetails.quantity, // Keep original for reference
           createdDate: orderDetails.createdAt,
           referenceNo: orderDetails.referenceNo,
           deliveryDate: orderDetails.deliveryDate,
@@ -1046,18 +1127,52 @@ class OrderController {
           gpNo: orderDetails.gpNo,
           invoiceNo: orderDetails.invoiceNo,
           notes: orderDetails.notes,
-          records: orderDetails.records.map((record) => ({
-            id: record.id,
-            quantity: record.quantity,
-            washType: record.washType,
-            processTypes: record.processTypes,
-            itemName: record.itemName,
-            itemId: record.itemId,
-            status: record.status,
-            trackingNumber: record.trackingNumber,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
-          })),
+          balance: customerBalance, // Add customer balance
+          records: await Promise.all(
+            orderDetails.records.map(async (record) => {
+              // Get actual output quantity from machine assignments
+              const { machineAssignments } = require("../db/schema");
+              const { sum } = require("drizzle-orm");
+
+              // Get all machine assignments for this record
+              const assignments = await db
+                .select({
+                  returnQuantity: machineAssignments.returnQuantity,
+                })
+                .from(machineAssignments)
+                .where(eq(machineAssignments.recordId, record.id));
+
+              // Sum up the return quantities
+              const totalReturnQuantity = assignments.reduce(
+                (sum, assignment) => {
+                  return (
+                    sum +
+                    (assignment.returnQuantity
+                      ? parseFloat(assignment.returnQuantity)
+                      : 0)
+                  );
+                },
+                0
+              );
+
+              const actualQuantity =
+                totalReturnQuantity > 0 ? totalReturnQuantity : record.quantity;
+
+              return {
+                id: record.id,
+                quantity: actualQuantity, // Use actual output quantity instead of original
+                originalQuantity: record.quantity, // Keep original for reference
+                washType: record.washType,
+                processTypes: record.processTypes,
+                itemName: record.itemName,
+                itemId: record.itemId,
+                status: record.status,
+                trackingNumber: record.trackingNumber,
+                createdAt: record.createdAt,
+                updatedAt: record.updatedAt,
+              };
+            })
+          ),
         },
       });
     } catch (error) {
