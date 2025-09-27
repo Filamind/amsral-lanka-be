@@ -44,10 +44,16 @@ router.post("/", OrderController.createOrder);
 // POST /api/orders/:orderId/records - Add order record
 router.post("/:orderId/records", OrderController.addOrderRecord);
 
+// POST /api/orders/:orderId/damage-records - Update damage counts for order records
+router.post("/:orderId/damage-records", OrderController.updateDamageRecords);
+
 // PUT /api/orders/:id - Update order
 router.put("/:id", OrderController.updateOrder);
 
 // DELETE /api/orders/:id - Delete order
 router.delete("/:id", OrderController.deleteOrder);
+
+// DELETE /api/orders - Delete all orders (for testing purposes)
+router.delete("/", OrderController.deleteAllOrders);
 
 module.exports = router;

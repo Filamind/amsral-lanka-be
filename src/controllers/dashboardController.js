@@ -155,10 +155,10 @@ class DashboardController {
         DashboardController.getDailyOrdersData(start, end),
 
         // Order status distribution
-        DashboardController.getOrderStatusDistribution(start, end),
+        DashboardController.getOrderStatusDistributionData(start, end),
 
         // Recent orders
-        DashboardController.getRecentOrders(10),
+        DashboardController.getRecentOrdersData(10),
       ]);
 
       const totalOrders = totalOrdersResult[0]?.count || 0;
@@ -524,18 +524,16 @@ class DashboardController {
     }
   }
 
-  // Helper method to calculate total revenue
+  // Helper method to calculate total revenue from invoices
   static async calculateTotalRevenue(start, end) {
     try {
+      const { invoices } = require("../db/schema");
       const [result] = await db
         .select({
-          totalRevenue:
-            sql`SUM(COALESCE(${orders.amount}, ${orders.quantity} * 100))`.as(
-              "totalRevenue"
-            ), // Use actual amount or fallback calculation
+          totalRevenue: sum(invoices.total),
         })
-        .from(orders)
-        .where(between(orders.date, start, end));
+        .from(invoices)
+        .where(between(invoices.createdAt, start, end));
 
       return parseFloat(result?.totalRevenue) || 0;
     } catch (error) {

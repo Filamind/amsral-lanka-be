@@ -116,6 +116,7 @@ const customers = pgTable("customers", {
   dateOfBirth: date("date_of_birth"),
   notes: text("notes"),
   incrementNumber: integer("increment_number").default(0), // Counter for invoice numbers
+  balance: decimal("balance", { precision: 10, scale: 2 }).default("0.00"),
   isActive: boolean("is_active").default(true),
   isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -159,21 +160,23 @@ const orders = pgTable(
     date: date("date").notNull(),
     referenceNo: varchar("reference_no", { length: 50 }).unique().notNull(),
     customerId: varchar("customer_id", { length: 50 }).notNull(),
+    itemId: varchar("item_id", { length: 50 }).notNull(),
     quantity: integer("quantity").notNull(),
     notes: text("notes"),
     deliveryDate: date("delivery_date").notNull(),
     status: varchar("status", { length: 20 }).default("Pending"),
     billingStatus: varchar("billing_status", { length: 20 }).default("pending"), // "pending", "invoiced", "paid"
     amount: decimal("amount", { precision: 10, scale: 2 }).default("0.00"),
-    isPaid: boolean("is_paid").default(false),
+    deliveryQuantity: integer("delivery_quantity").default(0), // Delivery quantity counter
     gpNo: varchar("gp_no", { length: 100 }), // GP Number - optional
-    invoiceNo: varchar("invoice_no", { length: 100 }), // Invoice Number - generated
+    invoiceNo: varchar("invoice_no", { length: 100 }), // Invoice Number - assigned when invoice is created
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
     referenceNoIdx: index("idx_reference_no").on(table.referenceNo),
     customerIdIdx: index("idx_customer_id").on(table.customerId),
+    itemIdIdx: index("idx_item_id").on(table.itemId),
     statusIdx: index("idx_status").on(table.status),
     billingStatusIdx: index("idx_billing_status").on(table.billingStatus),
     dateIdx: index("idx_date").on(table.date),
@@ -204,6 +207,7 @@ const orderRecords = pgTable(
       "0.00"
     ),
     isPaid: boolean("is_paid").default(false),
+    damageCount: integer("damage_count").default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
@@ -233,6 +237,7 @@ const machineAssignments = pgTable(
       onDelete: "set null",
     }),
     quantity: integer("quantity").notNull(),
+    returnQuantity: integer("return_quantity"),
     washingMachine: varchar("washing_machine", { length: 50 }),
     dryingMachine: varchar("drying_machine", { length: 50 }),
     trackingNumber: varchar("tracking_number", { length: 20 }),
@@ -270,6 +275,7 @@ const invoices = pgTable(
     paymentTerms: integer("payment_terms").notNull(),
     dueDate: date("due_date").notNull(),
     status: varchar("status", { length: 20 }).default("draft"), // "draft", "sent", "paid", "overdue"
+    payment: decimal("payment", { precision: 10, scale: 2 }).default("0.00"),
     paymentDate: date("payment_date"),
     paymentMethod: varchar("payment_method", { length: 50 }),
     paymentReference: varchar("payment_reference", { length: 255 }),
