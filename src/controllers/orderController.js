@@ -1067,6 +1067,49 @@ class OrderController {
         }
       }
 
+      // Calculate total actual quantity from all records
+      const recordsWithActualQuantity = await Promise.all(
+        orderDetails.records.map(async (record) => {
+          const { machineAssignments } = require("../db/schema");
+
+          // Get all machine assignments for this record
+          const assignments = await db
+            .select({
+              returnQuantity: machineAssignments.returnQuantity,
+            })
+            .from(machineAssignments)
+            .where(eq(machineAssignments.recordId, record.id));
+
+          // Sum up the return quantities
+          const totalReturnQuantity = assignments.reduce((sum, assignment) => {
+            return (
+              sum +
+              (assignment.returnQuantity
+                ? parseFloat(assignment.returnQuantity)
+                : 0)
+            );
+          }, 0);
+
+          return totalReturnQuantity > 0
+            ? totalReturnQuantity
+            : record.quantity;
+        })
+      );
+
+      const totalActualQuantity = recordsWithActualQuantity.reduce(
+        (sum, qty) => sum + qty,
+        0
+      );
+
+      // Get customer balance
+      const [customer] = await db
+        .select({ balance: customers.balance })
+        .from(customers)
+        .where(eq(customers.id, parseInt(orderDetails.customerId)))
+        .limit(1);
+
+      const customerBalance = customer?.balance ? parseFloat(customer.balance) : 0;
+
       return res.status(200).json({
         success: true,
         data: {
@@ -1074,7 +1117,8 @@ class OrderController {
           customerId: orderDetails.customerId,
           customerName: orderDetails.customerName,
           orderDate: orderDetails.date,
-          totalQuantity: orderDetails.quantity,
+          totalQuantity: totalActualQuantity, // Use actual total quantity
+          originalTotalQuantity: orderDetails.quantity, // Keep original for reference
           createdDate: orderDetails.createdAt,
           referenceNo: orderDetails.referenceNo,
           deliveryDate: orderDetails.deliveryDate,
@@ -1083,18 +1127,52 @@ class OrderController {
           gpNo: orderDetails.gpNo,
           invoiceNo: orderDetails.invoiceNo,
           notes: orderDetails.notes,
-          records: orderDetails.records.map((record) => ({
-            id: record.id,
-            quantity: record.quantity,
-            washType: record.washType,
-            processTypes: record.processTypes,
-            itemName: record.itemName,
-            itemId: record.itemId,
-            status: record.status,
-            trackingNumber: record.trackingNumber,
-            createdAt: record.createdAt,
-            updatedAt: record.updatedAt,
-          })),
+          balance: customerBalance, // Add customer balance
+          records: await Promise.all(
+            orderDetails.records.map(async (record) => {
+              // Get actual output quantity from machine assignments
+              const { machineAssignments } = require("../db/schema");
+              const { sum } = require("drizzle-orm");
+
+              // Get all machine assignments for this record
+              const assignments = await db
+                .select({
+                  returnQuantity: machineAssignments.returnQuantity,
+                })
+                .from(machineAssignments)
+                .where(eq(machineAssignments.recordId, record.id));
+
+              // Sum up the return quantities
+              const totalReturnQuantity = assignments.reduce(
+                (sum, assignment) => {
+                  return (
+                    sum +
+                    (assignment.returnQuantity
+                      ? parseFloat(assignment.returnQuantity)
+                      : 0)
+                  );
+                },
+                0
+              );
+
+              const actualQuantity =
+                totalReturnQuantity > 0 ? totalReturnQuantity : record.quantity;
+
+              return {
+                id: record.id,
+                quantity: actualQuantity, // Use actual output quantity instead of original
+                originalQuantity: record.quantity, // Keep original for reference
+                washType: record.washType,
+                processTypes: record.processTypes,
+                itemName: record.itemName,
+                itemId: record.itemId,
+                status: record.status,
+                trackingNumber: record.trackingNumber,
+                createdAt: record.createdAt,
+                updatedAt: record.updatedAt,
+              };
+            })
+          ),
         },
       });
     } catch (error) {

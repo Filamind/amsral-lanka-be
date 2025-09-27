@@ -35,7 +35,7 @@ class BillingController {
           lastName: customers.lastName,
         })
         .from(customers)
-        .where(eq(customers.id, customerId))
+        .where(eq(customers.id, parseInt(customerId)))
         .limit(1);
 
       if (customer) {
@@ -43,6 +43,7 @@ class BillingController {
       }
       return `Customer ${customerId}`;
     } catch (error) {
+      console.error("Error getting customer name:", error);
       return `Customer ${customerId}`;
     }
   }
@@ -157,7 +158,9 @@ class BillingController {
       const enhancedOrders = await Promise.all(
         orderList.map(async (order) => ({
           ...order,
-          customerName: await this.getCustomerName(order.customerId),
+          customerName: await BillingController.getCustomerName(
+            order.customerId
+          ),
           billingStatus: order.billingStatus || "pending",
         }))
       );
@@ -1631,6 +1634,113 @@ class BillingController {
       });
     } catch (error) {
       console.error("Error getting top customers:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // 15. PATCH /api/billing/invoices/:invoiceId/payment - Update invoice payment
+  static async updateInvoicePayment(req, res) {
+    try {
+      const { invoiceId } = req.params;
+      const { paymentAmount } = req.body;
+
+      // Validation
+      if (!paymentAmount || paymentAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment amount must be greater than 0",
+        });
+      }
+
+      // Get invoice details
+      const [invoice] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, parseInt(invoiceId)))
+        .limit(1);
+
+      if (!invoice) {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found",
+        });
+      }
+
+      const currentPayment = parseFloat(invoice.payment || 0);
+      const total = parseFloat(invoice.total);
+      const newPayment = currentPayment + parseFloat(paymentAmount);
+      const remaining = total - newPayment;
+
+      // Update invoice payment
+      console.log("📝 TABLE UPDATE: invoices (payment)");
+      await db
+        .update(invoices)
+        .set({
+          payment: newPayment.toString(),
+          paymentDate: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(invoices.id, parseInt(invoiceId)));
+
+      // Update customer balance
+      console.log("📝 TABLE UPDATE: customers (balance)");
+      const { customers } = require("../db/schema");
+      await db
+        .update(customers)
+        .set({
+          balance: remaining.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, invoice.customerId));
+
+      // If payment equals total, mark as paid
+      if (newPayment >= total) {
+        console.log("📝 TABLE UPDATE: invoices (status)");
+        await db
+          .update(invoices)
+          .set({
+            status: "paid",
+            updatedAt: new Date(),
+          })
+          .where(eq(invoices.id, parseInt(invoiceId)));
+
+        // Update order billing statuses to "paid"
+        console.log("📝 TABLE UPDATE: orders (billing status)");
+        const orderIds = JSON.parse(invoice.orderIds);
+        await db
+          .update(orders)
+          .set({
+            billingStatus: "paid",
+            updatedAt: new Date(),
+          })
+          .where(inArray(orders.id, orderIds));
+      }
+
+      // Get updated invoice
+      const [updatedInvoice] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, parseInt(invoiceId)))
+        .limit(1);
+
+      res.json({
+        success: true,
+        message: "Payment updated successfully",
+        data: {
+          invoiceId: parseInt(invoiceId),
+          paymentAmount: parseFloat(paymentAmount),
+          totalPayment: newPayment,
+          remaining: Math.max(0, remaining),
+          isFullyPaid: newPayment >= total,
+          status: updatedInvoice.status,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating invoice payment:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

@@ -32,6 +32,7 @@ export const customers = pgTable("customers", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	isDeleted: boolean("is_deleted").default(false),
 	incrementNumber: integer("increment_number").default(0),
+	balance: numeric({ precision: 10, scale: 2 }).default('0.00'),
 }, (table) => [
 	unique("customers_customer_code_unique").on(table.customerCode),
 	unique("customers_email_unique").on(table.email),
@@ -230,6 +231,7 @@ export const invoices = pgTable("invoices", {
 	paymentTerms: integer("payment_terms").notNull(),
 	dueDate: date("due_date").notNull(),
 	status: varchar({ length: 20 }).default('draft'),
+	payment: numeric({ precision: 10, scale: 2 }).default('0.00'),
 	paymentDate: date("payment_date"),
 	paymentMethod: varchar("payment_method", { length: 50 }),
 	paymentReference: varchar("payment_reference", { length: 255 }),

@@ -81,4 +81,10 @@ router.get("/income/trends", BillingController.getIncomeTrends);
 // 20. Get Top Customers
 router.get("/top-customers", BillingController.getTopCustomers);
 
+// 21. Update Invoice Payment
+router.patch(
+  "/invoices/:invoiceId/payment",
+  BillingController.updateInvoicePayment
+);
+
 module.exports = router;

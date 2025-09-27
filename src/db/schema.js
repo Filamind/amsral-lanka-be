@@ -116,6 +116,7 @@ const customers = pgTable("customers", {
   dateOfBirth: date("date_of_birth"),
   notes: text("notes"),
   incrementNumber: integer("increment_number").default(0), // Counter for invoice numbers
+  balance: decimal("balance", { precision: 10, scale: 2 }).default("0.00"),
   isActive: boolean("is_active").default(true),
   isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -272,6 +273,7 @@ const invoices = pgTable(
     paymentTerms: integer("payment_terms").notNull(),
     dueDate: date("due_date").notNull(),
     status: varchar("status", { length: 20 }).default("draft"), // "draft", "sent", "paid", "overdue"
+    payment: decimal("payment", { precision: 10, scale: 2 }).default("0.00"),
     paymentDate: date("payment_date"),
     paymentMethod: varchar("payment_method", { length: 50 }),
     paymentReference: varchar("payment_reference", { length: 255 }),
