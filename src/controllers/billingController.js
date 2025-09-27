@@ -8,6 +8,7 @@ const {
   orderPricingHistory,
   orderRecordPricingHistory,
   items,
+  machineAssignments,
 } = require("../db/schema");
 const {
   eq,
@@ -45,6 +46,39 @@ class BillingController {
     } catch (error) {
       console.error("Error getting customer name:", error);
       return `Customer ${customerId}`;
+    }
+  }
+
+  // Helper method to get return quantity for an order
+  static async getReturnQuantity(orderId) {
+    try {
+      const [result] = await db
+        .select({
+          totalReturnQuantity: sum(machineAssignments.returnQuantity),
+        })
+        .from(machineAssignments)
+        .where(eq(machineAssignments.orderId, parseInt(orderId)));
+
+      return result?.totalReturnQuantity || 0;
+    } catch (error) {
+      console.error("Error getting return quantity:", error);
+      return 0;
+    }
+  }
+
+  // Helper method to get customer balance
+  static async getCustomerBalance(customerId) {
+    try {
+      const [customer] = await db
+        .select({ balance: customers.balance })
+        .from(customers)
+        .where(eq(customers.id, parseInt(customerId)))
+        .limit(1);
+
+      return parseFloat(customer?.balance || 0);
+    } catch (error) {
+      console.error("Error getting customer balance:", error);
+      return 0;
     }
   }
 
@@ -96,6 +130,7 @@ class BillingController {
         customerName,
         orderId,
         billingStatus,
+        status,
         dateFrom,
         dateTo,
       } = req.query;
@@ -114,6 +149,11 @@ class BillingController {
       if (billingStatus) {
         // Use billing_status column for filtering
         conditions.push(eq(orders.billingStatus, billingStatus));
+      }
+
+      if (status) {
+        // Filter by order status
+        conditions.push(eq(orders.status, status));
       }
 
       if (dateFrom && dateTo) {
@@ -154,7 +194,7 @@ class BillingController {
       const totalItems = totalResult.count;
       const totalPages = Math.ceil(totalItems / parseInt(limit));
 
-      // Enhance with customer names
+      // Enhance with customer names, return quantity, and balance
       const enhancedOrders = await Promise.all(
         orderList.map(async (order) => ({
           ...order,
@@ -162,6 +202,8 @@ class BillingController {
             order.customerId
           ),
           billingStatus: order.billingStatus || "pending",
+          returnQuantity: await BillingController.getReturnQuantity(order.id),
+          balance: await BillingController.getCustomerBalance(order.customerId),
         }))
       );
 
@@ -645,6 +687,7 @@ class BillingController {
           total: invoices.total,
           status: invoices.status,
           dueDate: invoices.dueDate,
+          payment: invoices.payment,
           createdAt: invoices.createdAt,
         })
         .from(invoices)
@@ -670,6 +713,7 @@ class BillingController {
             subtotal: parseFloat(invoice.subtotal),
             taxAmount: parseFloat(invoice.taxAmount),
             total: parseFloat(invoice.total),
+            payment: parseFloat(invoice.payment || 0),
           })),
           pagination: {
             currentPage: parseInt(page),

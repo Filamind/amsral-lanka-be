@@ -44,6 +44,9 @@ router.post("/", OrderController.createOrder);
 // POST /api/orders/:orderId/records - Add order record
 router.post("/:orderId/records", OrderController.addOrderRecord);
 
+// POST /api/orders/:orderId/damage-records - Update damage counts for order records
+router.post("/:orderId/damage-records", OrderController.updateDamageRecords);
+
 // PUT /api/orders/:id - Update order
 router.put("/:id", OrderController.updateOrder);
 

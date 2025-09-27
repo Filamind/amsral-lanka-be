@@ -243,6 +243,8 @@ class OrderController {
           billingStatus: order.billingStatus || "pending",
           recordsCount: order.recordsCount || 0,
           complete: order.complete || false,
+          returnQuantity: order.returnQuantity || 0,
+          deliveryQuantity: order.deliveryQuantity || 0,
           overdue: isOverdue,
           createdAt: order.createdAt,
           updatedAt: order.updatedAt,
@@ -352,6 +354,10 @@ class OrderController {
           // Get completion statistics for this record
           const stats = await MachineAssignment.getRecordStats(record.id);
 
+          // Get return quantity for this record
+          const returnQuantity =
+            await MachineAssignment.getReturnQuantityByRecord(record.id);
+
           // Check if record is complete
           const isComplete = await OrderRecord.isRecordComplete(record.id);
 
@@ -383,6 +389,8 @@ class OrderController {
             trackingNumber: record.trackingNumber,
             status: record.status,
             complete: isComplete,
+            returnQuantity: returnQuantity,
+            damageCount: record.damageCount || 0,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,
             assignments: assignments.map((assignment) => ({
@@ -672,6 +680,7 @@ class OrderController {
         deliveryDate,
         status,
         gpNo,
+        deliveryCount,
         records = [],
       } = req.body;
 
@@ -689,6 +698,10 @@ class OrderController {
 
       if (quantity && quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
+
+      if (deliveryCount !== undefined && deliveryCount < 0)
+        errors.deliveryCount =
+          "Delivery count must be greater than or equal to 0";
 
       // Validate records if provided
       if (records && records.length > 0) {
@@ -742,11 +755,18 @@ class OrderController {
         if (status) orderUpdateData.status = status;
         if (gpNo !== undefined) orderUpdateData.gpNo = gpNo;
 
+        // Handle delivery count - add to existing delivery quantity
+        if (deliveryCount !== undefined) {
+          const currentDeliveryQuantity = existingOrder.deliveryQuantity || 0;
+          orderUpdateData.deliveryQuantity =
+            currentDeliveryQuantity + parseInt(deliveryCount);
+        }
+
         const updatedOrder = await Order.update(id, orderUpdateData);
 
         // Handle records if provided
         let updatedRecords = [];
-        if (records && records.length >= 0) {
+        if (records && records.length > 0) {
           // Get existing records
           const existingRecords = await OrderRecord.findByOrderId(id);
           const existingRecordIds = existingRecords.map((r) => r.id);
@@ -1108,7 +1128,9 @@ class OrderController {
         .where(eq(customers.id, parseInt(orderDetails.customerId)))
         .limit(1);
 
-      const customerBalance = customer?.balance ? parseFloat(customer.balance) : 0;
+      const customerBalance = customer?.balance
+        ? parseFloat(customer.balance)
+        : 0;
 
       return res.status(200).json({
         success: true,
@@ -1155,8 +1177,12 @@ class OrderController {
                 0
               );
 
+              // Subtract damage count from return quantity
+              const damageCount = record.damageCount || 0;
               const actualQuantity =
-                totalReturnQuantity > 0 ? totalReturnQuantity : record.quantity;
+                totalReturnQuantity > 0
+                  ? Math.max(0, totalReturnQuantity - damageCount)
+                  : record.quantity;
 
               return {
                 id: record.id,
@@ -1431,6 +1457,89 @@ class OrderController {
     } catch (error) {
       console.error("Error getting order records details:", error);
       return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // POST /api/orders/:orderId/damage-records - Update damage counts for order records
+  static async updateDamageRecords(req, res) {
+    try {
+      const { orderId } = req.params;
+      const { damageCounts } = req.body;
+
+      // Validate input
+      if (!damageCounts || typeof damageCounts !== "object") {
+        return res.status(400).json({
+          success: false,
+          message: "damageCounts object is required",
+        });
+      }
+
+      // Check if order exists
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+
+      // Validate that all record IDs belong to this order
+      const recordIds = Object.keys(damageCounts);
+      if (recordIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one record ID is required",
+        });
+      }
+
+      // Get all records for this order
+      const records = await OrderRecord.findByOrderId(orderId);
+      const validRecordIds = records.map((record) => record.id.toString());
+
+      // Validate record IDs
+      for (const recordId of recordIds) {
+        if (!validRecordIds.includes(recordId)) {
+          return res.status(400).json({
+            success: false,
+            message: `Record ID ${recordId} does not belong to order ${orderId}`,
+          });
+        }
+
+        const damageCount = damageCounts[recordId];
+        if (typeof damageCount !== "number" || damageCount < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Damage count for record ${recordId} must be a non-negative number`,
+          });
+        }
+      }
+
+      // Update damage counts
+      const updatePromises = recordIds.map(async (recordId) => {
+        const damageCount = damageCounts[recordId];
+        return await OrderRecord.update(recordId, { damageCount });
+      });
+
+      await Promise.all(updatePromises);
+
+      // Change order status to "QC" if current status is "Complete"
+      if (order.status === "Complete") {
+        await Order.update(orderId, { status: "QC" });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          message: "Damage records saved successfully",
+        },
+      });
+    } catch (error) {
+      console.error("Error updating damage records:", error);
+      res.status(500).json({
         success: false,
         message: "Internal server error",
         error: error.message,
