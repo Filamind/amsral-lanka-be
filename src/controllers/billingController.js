@@ -129,6 +129,7 @@ class BillingController {
         page = 1,
         limit = 10,
         customerName,
+        customerId,
         orderId,
         billingStatus,
         status,
@@ -141,6 +142,10 @@ class BillingController {
 
       if (customerName) {
         // We'll need to join with customers table
+      }
+
+      if (customerId) {
+        conditions.push(eq(orders.customerId, customerId));
       }
 
       if (orderId) {

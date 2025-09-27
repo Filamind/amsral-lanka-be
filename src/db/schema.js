@@ -197,7 +197,7 @@ const orderRecords = pgTable(
     itemId: varchar("item_id", { length: 50 }),
     quantity: integer("quantity").notNull(),
     washType: varchar("wash_type", { length: 50 }).notNull(),
-    processTypes: json("process_types").notNull(),
+    processTypes: json("process_types"),
     trackingNumber: varchar("tracking_number", { length: 20 }),
     status: varchar("status", { length: 20 }).notNull().default("Pending"), // "Pending", "Complete"
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).default(

@@ -183,7 +183,7 @@ export const orderRecords = pgTable("order_records", {
 	orderId: integer("order_id").notNull(),
 	quantity: integer().notNull(),
 	washType: varchar("wash_type", { length: 50 }).notNull(),
-	processTypes: json("process_types").notNull(),
+	processTypes: json("process_types"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	itemId: varchar("item_id", { length: 50 }),
