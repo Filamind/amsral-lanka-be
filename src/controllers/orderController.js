@@ -22,12 +22,12 @@ class OrderController {
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!washType) errors.washType = "Wash type is required";
-      if (
-        !processTypes ||
-        !Array.isArray(processTypes) ||
-        processTypes.length === 0
-      )
-        errors.processTypes = "Process types are required";
+      // Process types are now optional - only validate if provided
+      if (processTypes !== undefined && processTypes !== null) {
+        if (!Array.isArray(processTypes)) {
+          errors.processTypes = "Process types must be an array";
+        }
+      }
 
       if (Object.keys(errors).length > 0) {
         return res
@@ -130,12 +130,12 @@ class OrderController {
       if (!quantity || quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!washType) errors.washType = "Wash type is required";
-      if (
-        !processTypes ||
-        !Array.isArray(processTypes) ||
-        processTypes.length === 0
-      )
-        errors.processTypes = "Process types are required";
+      // Process types are now optional - only validate if provided
+      if (processTypes !== undefined && processTypes !== null) {
+        if (!Array.isArray(processTypes)) {
+          errors.processTypes = "Process types must be an array";
+        }
+      }
 
       if (Object.keys(errors).length > 0) {
         return res
@@ -585,12 +585,15 @@ class OrderController {
           if (!record.washType) {
             errors[`records.${i}.washType`] = "Wash type is required";
           }
+          // Process types are now optional - only validate if provided
           if (
-            !record.processTypes ||
-            !Array.isArray(record.processTypes) ||
-            record.processTypes.length === 0
+            record.processTypes !== undefined &&
+            record.processTypes !== null
           ) {
-            errors[`records.${i}.processTypes`] = "Process types are required";
+            if (!Array.isArray(record.processTypes)) {
+              errors[`records.${i}.processTypes`] =
+                "Process types must be an array";
+            }
           }
         }
       }

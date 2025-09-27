@@ -89,11 +89,15 @@ class OrderRecord {
         throw new Error(`Invalid wash type: ${mappedData.washType}`);
       }
 
-      // Validate process types against database
-      const processTypesList = await this.getProcessTypes();
-      const validProcessTypeCodes = processTypesList.map((pt) => pt.code);
+      // Validate process types against database (only if provided)
+      if (
+        mappedData.processTypes &&
+        Array.isArray(mappedData.processTypes) &&
+        mappedData.processTypes.length > 0
+      ) {
+        const processTypesList = await this.getProcessTypes();
+        const validProcessTypeCodes = processTypesList.map((pt) => pt.code);
 
-      if (mappedData.processTypes && Array.isArray(mappedData.processTypes)) {
         const invalidTypes = mappedData.processTypes.filter(
           (type) => !validProcessTypeCodes.includes(type)
         );
@@ -522,8 +526,13 @@ class OrderRecord {
 
   // Map array of process type IDs to code values from database
   static async mapProcessTypeIds(processTypeIds) {
-    if (!Array.isArray(processTypeIds)) {
-      return processTypeIds;
+    // Handle null, undefined, or empty arrays
+    if (
+      !processTypeIds ||
+      !Array.isArray(processTypeIds) ||
+      processTypeIds.length === 0
+    ) {
+      return null;
     }
     const mappedIds = await Promise.all(
       processTypeIds.map((id) => this.mapProcessTypeId(id))
