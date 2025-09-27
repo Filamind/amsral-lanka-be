@@ -190,6 +190,7 @@ class Order {
             status: orders.status,
             billingStatus: orders.billingStatus,
             amount: orders.amount,
+            deliveryQuantity: orders.deliveryQuantity,
             gpNo: orders.gpNo,
             invoiceNo: orders.invoiceNo,
             createdAt: orders.createdAt,
@@ -240,6 +241,7 @@ class Order {
             status: orders.status,
             billingStatus: orders.billingStatus,
             amount: orders.amount,
+            deliveryQuantity: orders.deliveryQuantity,
             gpNo: orders.gpNo,
             invoiceNo: orders.invoiceNo,
             createdAt: orders.createdAt,
@@ -252,13 +254,14 @@ class Order {
           .offset(offset);
       }
 
-      // Enhance with customer names, records count, and completion status
+      // Enhance with customer names, records count, completion status, and return quantity
       const enhancedOrders = await Promise.all(
         orderList.map(async (order) => ({
           ...order,
           customerName: await this.getCustomerName(order.customerId),
           recordsCount: await this.getRecordsCount(order.id),
           complete: await this.isOrderComplete(order.id),
+          returnQuantity: await this.getReturnQuantity(order.id),
           records: await this.getOrderRecords(order.id),
         }))
       );
@@ -736,6 +739,23 @@ class Order {
 
       return result.count;
     } catch (error) {
+      return 0;
+    }
+  }
+
+  static async getReturnQuantity(orderId) {
+    try {
+      const [result] = await db
+        .select({
+          totalReturnQuantity: sum(machineAssignments.returnQuantity),
+        })
+        .from(machineAssignments)
+        .where(eq(machineAssignments.orderId, parseInt(orderId)));
+
+      // Convert to number to ensure consistent data type
+      return parseInt(result?.totalReturnQuantity) || 0;
+    } catch (error) {
+      console.error("Error getting return quantity:", error);
       return 0;
     }
   }

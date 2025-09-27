@@ -566,6 +566,24 @@ class MachineAssignment {
       return null;
     }
   }
+
+  // Get return quantity for a specific record
+  static async getReturnQuantityByRecord(recordId) {
+    try {
+      const [result] = await db
+        .select({
+          totalReturnQuantity: sum(machineAssignments.returnQuantity),
+        })
+        .from(machineAssignments)
+        .where(eq(machineAssignments.recordId, parseInt(recordId)));
+
+      // Convert to number to ensure consistent data type
+      return parseInt(result?.totalReturnQuantity) || 0;
+    } catch (error) {
+      console.error("Error getting return quantity for record:", error);
+      return 0;
+    }
+  }
 }
 
 module.exports = MachineAssignment;

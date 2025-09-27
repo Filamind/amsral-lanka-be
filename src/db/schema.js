@@ -167,6 +167,7 @@ const orders = pgTable(
     status: varchar("status", { length: 20 }).default("Pending"),
     billingStatus: varchar("billing_status", { length: 20 }).default("pending"), // "pending", "invoiced", "paid"
     amount: decimal("amount", { precision: 10, scale: 2 }).default("0.00"),
+    deliveryQuantity: integer("delivery_quantity").default(0), // Delivery quantity counter
     gpNo: varchar("gp_no", { length: 100 }), // GP Number - optional
     invoiceNo: varchar("invoice_no", { length: 100 }), // Invoice Number - assigned when invoice is created
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -206,6 +207,7 @@ const orderRecords = pgTable(
       "0.00"
     ),
     isPaid: boolean("is_paid").default(false),
+    damageCount: integer("damage_count").default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },

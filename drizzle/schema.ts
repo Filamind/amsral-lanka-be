@@ -192,6 +192,7 @@ export const orderRecords = pgTable("order_records", {
 	unitPrice: numeric("unit_price", { precision: 10, scale:  2 }).default('0.00'),
 	totalPrice: numeric("total_price", { precision: 10, scale:  2 }).default('0.00'),
 	isPaid: boolean("is_paid").default(false),
+	damageCount: integer("damage_count").default(0),
 }, (table) => [
 	index("idx_order_records_item_id").using("btree", table.itemId.asc().nullsLast().op("text_ops")),
 	index("idx_order_records_order_id").using("btree", table.orderId.asc().nullsLast().op("int4_ops")),
@@ -260,6 +261,7 @@ export const orders = pgTable("orders", {
 	amount: numeric({ precision: 10, scale:  2 }).default('0.00'),
 	itemId: boolean("item_id").default(false),
 	billingStatus: varchar("billing_status", { length: 20 }).default('pending'),
+	deliveryQuantity: integer("delivery_quantity").default(0),
 	gpNo: varchar("gp_no", { length: 100 }),
 	invoiceNo: varchar("invoice_no", { length: 100 }),
 }, (table) => [
