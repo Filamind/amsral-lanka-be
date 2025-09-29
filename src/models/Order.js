@@ -453,7 +453,24 @@ class Order {
           .from(invoices);
 
         for (const invoice of invoicesWithOrder) {
-          const orderIds = JSON.parse(invoice.orderIds);
+          // Check if orderIds exists and is not null/undefined
+          if (!invoice.orderIds) {
+            continue;
+          }
+
+          let orderIds;
+          try {
+            orderIds = JSON.parse(invoice.orderIds);
+          } catch (error) {
+            console.error("Error parsing orderIds JSON:", error);
+            continue;
+          }
+
+          // Ensure orderIds is an array
+          if (!Array.isArray(orderIds)) {
+            continue;
+          }
+
           if (orderIds.includes(parseInt(id))) {
             // If this is the only order in the invoice, delete the entire invoice
             if (orderIds.length === 1) {
