@@ -26,7 +26,7 @@ const {
   inArray,
 } = require("drizzle-orm");
 //BillingController.js
-
+//comment
 class BillingController {
   // Helper method to get customer name
   static async getCustomerName(customerId) {
