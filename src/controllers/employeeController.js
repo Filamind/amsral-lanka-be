@@ -12,6 +12,8 @@ class EmployeeController {
         req.query.deleted !== undefined ? req.query.deleted === "true" : false; // Default to false to hide deleted
       const department = req.query.department;
       const position = req.query.position;
+      const sortBy = req.query.sortBy || "firstName";
+      const sortOrder = req.query.sortOrder || "asc";
 
       const offset = (page - 1) * limit;
 
@@ -38,6 +40,8 @@ class EmployeeController {
           isDeleted,
           department,
           position,
+          sortBy,
+          sortOrder,
         }),
         Employee.count({ isActive, isDeleted, department, position }),
       ]);

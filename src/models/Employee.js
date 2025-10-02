@@ -1,6 +1,6 @@
 const { db } = require("../config/db");
 const { employees } = require("../db/schema");
-const { eq, desc, count, like, and } = require("drizzle-orm");
+const { eq, desc, asc, count, like, and } = require("drizzle-orm");
 
 class Employee {
   constructor(employeeData) {
@@ -38,6 +38,8 @@ class Employee {
       isDeleted = false, // Default to false to only show non-deleted employees
       department = null,
       position = null,
+      sortBy = "firstName",
+      sortOrder = "asc",
     } = options;
 
     try {
@@ -66,8 +68,22 @@ class Employee {
         );
       }
 
+      // Build order by - for firstName, also sort by lastName for proper alphabetical order
+      let orderBy;
+      if (sortBy === "firstName") {
+        orderBy =
+          sortOrder === "asc"
+            ? [asc(employees.firstName), asc(employees.lastName)]
+            : [desc(employees.firstName), desc(employees.lastName)];
+      } else {
+        orderBy =
+          sortOrder === "asc"
+            ? asc(employees[sortBy])
+            : desc(employees[sortBy]);
+      }
+
       const result = await query
-        .orderBy(desc(employees.createdAt))
+        .orderBy(...(Array.isArray(orderBy) ? orderBy : [orderBy]))
         .limit(limit)
         .offset(offset);
 

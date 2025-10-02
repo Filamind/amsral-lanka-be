@@ -94,8 +94,8 @@ class Customer {
         search = null,
         mapLink = null,
         country = null,
-        sortBy = "createdAt",
-        sortOrder = "desc",
+        sortBy = "firstName",
+        sortOrder = "asc",
       } = options;
 
       // Build where conditions
@@ -125,9 +125,19 @@ class Customer {
         conditions.push(ilike(customers.country, `%${country}%`));
       }
 
-      // Build order by
-      const orderBy =
-        sortOrder === "asc" ? asc(customers[sortBy]) : desc(customers[sortBy]);
+      // Build order by - for firstName, also sort by lastName for proper alphabetical order
+      let orderBy;
+      if (sortBy === "firstName") {
+        orderBy =
+          sortOrder === "asc"
+            ? [asc(customers.firstName), asc(customers.lastName)]
+            : [desc(customers.firstName), desc(customers.lastName)];
+      } else {
+        orderBy =
+          sortOrder === "asc"
+            ? asc(customers[sortBy])
+            : desc(customers[sortBy]);
+      }
 
       const whereClause =
         conditions.length > 0 ? and(...conditions) : undefined;
@@ -136,7 +146,7 @@ class Customer {
         .select()
         .from(customers)
         .where(whereClause)
-        .orderBy(orderBy)
+        .orderBy(...(Array.isArray(orderBy) ? orderBy : [orderBy]))
         .limit(limit)
         .offset(offset);
 

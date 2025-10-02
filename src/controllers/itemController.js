@@ -7,8 +7,8 @@ class ItemController {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const search = req.query.search;
-      const sortBy = req.query.sortBy || "createdAt";
-      const sortOrder = req.query.sortOrder || "desc";
+      const sortBy = req.query.sortBy || "name";
+      const sortOrder = req.query.sortOrder || "asc";
 
       const offset = (page - 1) * limit;
 

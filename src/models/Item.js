@@ -95,8 +95,8 @@ class Item {
         limit = 10,
         offset = 0,
         search = null,
-        sortBy = "createdAt",
-        sortOrder = "desc",
+        sortBy = "name",
+        sortOrder = "asc",
       } = options;
 
       // Build where conditions
@@ -188,10 +188,7 @@ class Item {
       }
 
       // Check if code already exists (if being updated)
-      if (
-        updateData.code &&
-        updateData.code !== existingItem.code
-      ) {
+      if (updateData.code && updateData.code !== existingItem.code) {
         const existingCode = await this.findByCode(updateData.code);
         if (existingCode) {
           throw new Error("Item code already exists");
