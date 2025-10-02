@@ -11,8 +11,8 @@ class CustomerController {
       const search = req.query.search;
       const mapLink = req.query.mapLink;
       const country = req.query.country;
-      const sortBy = req.query.sortBy || "createdAt";
-      const sortOrder = req.query.sortOrder || "desc";
+      const sortBy = req.query.sortBy || "firstName";
+      const sortOrder = req.query.sortOrder || "asc";
 
       const offset = (page - 1) * limit;
 
@@ -446,6 +446,42 @@ class CustomerController {
       });
     } catch (error) {
       console.error("Error in generateCustomerCode:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  // GET /api/customers/all - Get all customers ordered by firstName alphabetically
+  static async getAllCustomers(req, res) {
+    try {
+      const isActive =
+        req.query.active !== undefined ? req.query.active === "true" : null;
+      const search = req.query.search;
+      const mapLink = req.query.mapLink;
+      const country = req.query.country;
+
+      const customers = await Customer.findAll({
+        limit: 10000, // Large limit to get all customers
+        offset: 0,
+        isActive,
+        search,
+        mapLink,
+        country,
+        sortBy: "firstName",
+        sortOrder: "asc",
+      });
+
+      res.json({
+        success: true,
+        data: { customers },
+        count: customers.length,
+      });
+    } catch (error) {
+      console.error("Error in getAllCustomers:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
