@@ -161,7 +161,7 @@ const orders = pgTable(
     referenceNo: varchar("reference_no", { length: 50 }).unique().notNull(),
     customerId: varchar("customer_id", { length: 50 }).notNull(),
     itemId: varchar("item_id", { length: 50 }).notNull(),
-    quantity: integer("quantity").notNull(),
+    quantity: integer("quantity"),
     notes: text("notes"),
     deliveryDate: date("delivery_date").notNull(),
     status: varchar("status", { length: 20 }).default("Pending"),

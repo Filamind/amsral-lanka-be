@@ -254,11 +254,12 @@ class Order {
           .offset(offset);
       }
 
-      // Enhance with customer names, records count, completion status, and return quantity
+      // Enhance with customer names, item names, records count, completion status, and return quantity
       const enhancedOrders = await Promise.all(
         orderList.map(async (order) => ({
           ...order,
           customerName: await this.getCustomerName(order.customerId),
+          itemName: await this.getItemName(order.itemId),
           recordsCount: await this.getRecordsCount(order.id),
           complete: await this.isOrderComplete(order.id),
           returnQuantity: await this.getReturnQuantity(order.id),
@@ -747,6 +748,28 @@ class Order {
     }
   }
 
+  static async getItemName(itemId) {
+    try {
+      // Get item name from items table
+      const [item] = await db
+        .select({
+          name: items.name,
+        })
+        .from(items)
+        .where(eq(items.id, itemId))
+        .limit(1);
+
+      if (item) {
+        return item.name;
+      }
+
+      return itemId; // Fallback to itemId if item not found
+    } catch (error) {
+      console.error(`Error fetching item name for itemId: ${itemId}`, error);
+      return itemId; // Fallback to itemId on error
+    }
+  }
+
   static async getRecordsCount(orderId) {
     try {
       const [result] = await db
@@ -813,6 +836,10 @@ class Order {
       const totalRecordQuantity = parseInt(result.totalRecordQuantity) || 0;
 
       // Order is complete if order quantity equals total record quantity
+      // If order quantity is null, consider it complete if there are records
+      if (order.quantity === null) {
+        return totalRecordQuantity > 0;
+      }
       return order.quantity === totalRecordQuantity;
     } catch (error) {
       console.error("Error checking order completion:", error);

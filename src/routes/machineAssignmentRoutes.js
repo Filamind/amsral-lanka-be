@@ -39,6 +39,9 @@ router.get(
   MachineAssignmentController.getAssignmentStats
 );
 
+// GET /api/assignments - Get all machine assignments with pagination (non-completed only)
+router.get("/assignments", MachineAssignmentController.getAllAssignments);
+
 // GET /api/machines - Get available machines
 router.get("/machines", MachineAssignmentController.getMachines);
 

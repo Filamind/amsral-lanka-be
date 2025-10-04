@@ -42,7 +42,7 @@ class Customer {
       const [customer] = await db
         .select()
         .from(customers)
-        .where(eq(customers.id, id))
+        .where(and(eq(customers.id, id), eq(customers.isDeleted, false)))
         .limit(1);
 
       return customer || null;
@@ -58,7 +58,12 @@ class Customer {
       const [customer] = await db
         .select()
         .from(customers)
-        .where(eq(customers.customerCode, customerCode))
+        .where(
+          and(
+            eq(customers.customerCode, customerCode),
+            eq(customers.isDeleted, false)
+          )
+        )
         .limit(1);
 
       return customer || null;
@@ -74,7 +79,7 @@ class Customer {
       const [customer] = await db
         .select()
         .from(customers)
-        .where(eq(customers.email, email))
+        .where(and(eq(customers.email, email), eq(customers.isDeleted, false)))
         .limit(1);
 
       return customer || null;
@@ -100,6 +105,9 @@ class Customer {
 
       // Build where conditions
       const conditions = [];
+
+      // Always filter out deleted customers
+      conditions.push(eq(customers.isDeleted, false));
 
       if (isActive !== null) {
         conditions.push(eq(customers.isActive, isActive));
@@ -169,6 +177,9 @@ class Customer {
 
       // Build where conditions
       const conditions = [];
+
+      // Always filter out deleted customers
+      conditions.push(eq(customers.isDeleted, false));
 
       if (isActive !== null) {
         conditions.push(eq(customers.isActive, isActive));
@@ -294,7 +305,12 @@ class Customer {
       const [latestCustomer] = await db
         .select({ customerCode: customers.customerCode })
         .from(customers)
-        .where(ilike(customers.customerCode, "CUST-%"))
+        .where(
+          and(
+            ilike(customers.customerCode, "CUST-%"),
+            eq(customers.isDeleted, false)
+          )
+        )
         .orderBy(desc(customers.customerCode))
         .limit(1);
 

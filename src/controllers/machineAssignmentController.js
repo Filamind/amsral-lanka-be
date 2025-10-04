@@ -376,6 +376,70 @@ class MachineAssignmentController {
     }
   }
 
+  // GET /api/assignments - Get all machine assignments with pagination (non-completed only)
+  static async getAllAssignments(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search = null,
+        sortBy = "id",
+        sortOrder = "desc",
+      } = req.query;
+
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+
+      // Validate pagination parameters
+      if (parseInt(limit) > 100) {
+        return res.status(400).json({
+          success: false,
+          message: "Limit cannot exceed 100",
+        });
+      }
+
+      if (parseInt(page) < 1 || parseInt(limit) < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Page and limit must be positive numbers",
+        });
+      }
+
+      const options = {
+        limit: parseInt(limit),
+        offset,
+        status: "In Progress", // Only get non-completed assignments
+        search,
+        sortBy,
+        sortOrder,
+      };
+
+      // Get assignments and total count
+      const assignments = await MachineAssignment.findAll(options);
+      const totalRecords = await MachineAssignment.count(options);
+      const totalPages = Math.ceil(totalRecords / parseInt(limit));
+
+      res.json({
+        success: true,
+        data: {
+          assignments,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages,
+            totalRecords,
+            limit: parseInt(limit),
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error getting all assignments:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
   // GET /api/machines - Get available machines
   static async getMachines(req, res) {
     try {
