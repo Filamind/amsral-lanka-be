@@ -236,6 +236,8 @@ class OrderController {
           referenceNo: order.referenceNo,
           customerId: order.customerId,
           customerName: order.customerName,
+          itemId: order.itemId,
+          itemName: order.itemName,
           quantity: order.quantity,
           notes: order.notes,
           deliveryDate: order.deliveryDate,
@@ -560,7 +562,7 @@ class OrderController {
       if (!date) errors.date = "Date is required";
       if (!customerId) errors.customerId = "Customer is required";
       if (!itemId) errors.itemId = "Item is required";
-      if (!quantity || quantity <= 0)
+      if (quantity !== undefined && quantity !== null && quantity <= 0)
         errors.quantity = "Quantity must be greater than 0";
       if (!deliveryDate) errors.deliveryDate = "Delivery date is required";
 
@@ -570,7 +572,12 @@ class OrderController {
           (sum, record) => sum + (record.quantity || 0),
           0
         );
-        if (totalRecordQuantity > quantity) {
+        // Only validate against order quantity if order quantity is provided
+        if (
+          quantity !== undefined &&
+          quantity !== null &&
+          totalRecordQuantity > quantity
+        ) {
           errors.records =
             "Records total quantity cannot exceed order quantity";
         }
@@ -613,7 +620,10 @@ class OrderController {
           date: new Date(date),
           customerId,
           itemId,
-          quantity: parseInt(quantity),
+          quantity:
+            quantity !== undefined && quantity !== null
+              ? parseInt(quantity)
+              : null,
           notes,
           deliveryDate: new Date(deliveryDate),
           gpNo: gpNo || null,
@@ -1005,6 +1015,13 @@ class OrderController {
           // Get order details
           const order = await Order.findById(record.orderId);
 
+          // Get item details
+          const [item] = await db
+            .select({ name: items.name })
+            .from(items)
+            .where(eq(items.id, record.itemId))
+            .limit(1);
+
           // Get assignment statistics
           const MachineAssignment = require("../models/MachineAssignment");
           const stats = await MachineAssignment.getRecordStats(record.id);
@@ -1016,6 +1033,7 @@ class OrderController {
             id: record.id,
             orderId: record.orderId,
             itemId: record.itemId,
+            itemName: item?.name || record.itemId, // Use item name if found, fallback to itemId
             quantity: record.quantity,
             washType: record.washType,
             processTypes: record.processTypes,
@@ -1024,7 +1042,6 @@ class OrderController {
             complete: isComplete, // Boolean: true if all assignments are completed
             orderRef: order?.referenceNo || null,
             customerName: order?.customerName || null,
-            itemName: record.itemId, // You might want to get actual item name from items table
             remainingQuantity: stats.remainingQuantity,
             createdAt: record.createdAt,
             updatedAt: record.updatedAt,

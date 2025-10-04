@@ -562,10 +562,17 @@ class OrderRecord {
         .from(orders)
         .where(eq(orders.id, orderId));
 
+      const orderQuantity = order?.quantity || 0;
+      const recordsQuantity = result.totalRecordQuantity || 0;
+
+      // If order quantity is null, validation is always valid
+      const isValid =
+        order?.quantity === null || recordsQuantity <= orderQuantity;
+
       return {
-        orderQuantity: order?.quantity || 0,
-        recordsQuantity: result.totalRecordQuantity || 0,
-        isValid: (result.totalRecordQuantity || 0) <= (order?.quantity || 0),
+        orderQuantity,
+        recordsQuantity,
+        isValid,
       };
     } catch (error) {
       console.error("Error validating total quantity:", error);
