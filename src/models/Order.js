@@ -144,7 +144,13 @@ class Order {
       }
 
       if (status) {
-        conditions.push(eq(orders.status, status));
+        // Handle multiple statuses separated by comma
+        const statuses = status.split(',').map(s => s.trim()).filter(s => s);
+        if (statuses.length === 1) {
+          conditions.push(eq(orders.status, statuses[0]));
+        } else if (statuses.length > 1) {
+          conditions.push(inArray(orders.status, statuses));
+        }
       }
 
       if (customerId) {
@@ -298,7 +304,13 @@ class Order {
       }
 
       if (status) {
-        conditions.push(eq(orders.status, status));
+        // Handle multiple statuses separated by comma
+        const statuses = status.split(',').map(s => s.trim()).filter(s => s);
+        if (statuses.length === 1) {
+          conditions.push(eq(orders.status, statuses[0]));
+        } else if (statuses.length > 1) {
+          conditions.push(inArray(orders.status, statuses));
+        }
       }
 
       if (customerId) {

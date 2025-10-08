@@ -533,14 +533,27 @@ class MachineAssignment {
 
       if (!order?.customerId) return null;
 
+      // Try to find customer by ID first (if customerId is numeric)
+      const customerId = parseInt(order.customerId);
+
       const [customer] = await db
-        .select({ name: customers.name })
+        .select({
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+        })
         .from(customers)
-        .where(eq(customers.id, order.customerId))
+        .where(eq(customers.id, customerId))
         .limit(1);
 
-      return customer?.name || null;
+      if (!customer) return null;
+
+      // Concatenate first and last name
+      const fullName = `${customer.firstName || ""} ${
+        customer.lastName || ""
+      }`.trim();
+      return fullName || null;
     } catch (error) {
+      console.error("Error in getCustomerName:", error);
       return null;
     }
   }
